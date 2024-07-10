@@ -6,6 +6,8 @@
         <h5>* ZecFaucet does not send to transparent addresses.</h5>
         <br/>
         <p>Don't have a Zcash wallet? Find the best wallet <a href="https://z.cash/wallets">here</a>.</p>
+        <p><b>ZecFaucet recommended wallet:</b> <a href="https://electriccoin.co/zashi/">Zashi</a>.</p>
+
         <input class="user-address" type="text" v-model="address">
         <button class="receive-zec" @click="claim" v-bind:disabled="disable_btn">Send</button>
         <!-- <h5>We're experiencing technical difficulties, keep in mind that you may not receive your claim. We apologize for that.</h5> -->

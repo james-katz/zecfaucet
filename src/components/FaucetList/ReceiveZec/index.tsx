@@ -96,7 +96,8 @@ const ReceiveZec: React.FC<ReceiveZecProps> = ({ payout }) => {
       <SubHeading>* Receive {payout.u} ZEC if using Orchard address <Tooltip>[?] <span className="tooltiptext">An Unified / Orchard address looks like this: u1h0dh...2llr</span> </Tooltip></SubHeading>
       <SubHeading>* Receive {payout.z} ZEC if using Sapling address <Tooltip>[?] <span className="tooltiptext">A Sapling address looks like this: zs1sf0...x583</span> </Tooltip></SubHeading>
       <SubHeading>* ZecFaucet does not send to transparent addresses. <Tooltip>[?] <span className="tooltiptext">A Transparent address looks like this: t1KPhq...BaQw</span> </Tooltip></SubHeading>
-      <Paragraph>Don't have a Zcash wallet? Find the best wallet <a href="https://z.cash/wallets">here</a>.</Paragraph>
+      <Paragraph>Visit <a href="https://zechub.wiki/guides/visualizing-zcash-addresses">ZecHub wiki</a> to learn more about Zcash addresses.</Paragraph>
+      <Paragraph>Don't have a Zcash wallet? Find the best wallet <a href="https://z.cash/wallets">here</a>.</Paragraph>      
       <P>ZecFaucet recommended wallet: <a href="https://electriccoin.co/zashi/">Zashi.</a></P>
       <Input type="text" value={address} onChange={(e) => setAddress(e.target.value)}  placeholder='Insert your wallet here!'/>
       <Message style={{ display: solveCaptcha ? 'block' : 'none' }}>Please solve the captcha before claiming.</Message>

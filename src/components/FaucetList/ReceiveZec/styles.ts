@@ -23,6 +23,7 @@ export const Paragraph = styled.p`
 
   a {
     color: #007bff;
+    font-weight: bold;
     text-decoration: none;
 
     &:hover {

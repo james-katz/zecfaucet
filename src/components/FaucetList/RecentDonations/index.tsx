@@ -6,8 +6,9 @@ interface TxDetails {
 }
 
 interface Donation {
-  txDetails: TxDetails[];
+  value: number;
   time: number;
+  memo: string;
 }
 
 interface RecentDonationsProps {
@@ -30,9 +31,9 @@ const RecentDonations: React.FC<RecentDonationsProps> = ({ donations }) => {
           <tbody>
             {donations.map((donation, i) => (
               <Row key={i}>
-                <Td>{donation.txDetails[0].amount} ZEC</Td>
+                <Td>{donation.value} ZEC</Td>
                 <Td>{new Date(donation.time * 1000).toLocaleDateString()}</Td>
-                <Td>{donation.txDetails[0].memos ? donation.txDetails[0].memos[0] : 'No memo available'}</Td>
+                <Td>{donation.memo}</Td>
               </Row>
             ))}
           </tbody>

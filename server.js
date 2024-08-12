@@ -1,4 +1,4 @@
-const { Worker } = require('worker_threads');
+// const { Worker } = require('worker_threads');
 
 const express = require('express');
 const bodyParser = require('body-parser')
@@ -18,9 +18,9 @@ const hc_secret = process.env.HCAPTCHA_SECRET;
 
 const useHttps = false;
 
-const LiteWallet = require('./zingolib-wrapper/zingo_litewallet');
+const LiteWallet = require('./zingolib-wrapper/zingolib');
 const { TxBuilder } = require('./zingolib-wrapper/utils/utils');
-const { join } = require('path');
+// const { join } = require('path');
 
 const app = express();
 const port = 2653;
@@ -45,8 +45,8 @@ app.set("trust proxy", true);
 // app.use(express.static(path.join(__dirname, 'dist')));
 
 // Setup lib
-const lwd = "https://mainnet.lightwalletd.com:9067/";
-const zingo = new LiteWallet(lwd, "main", false);
+const lwd = "https://zec.rocks:443/";
+const zingo = new LiteWallet(lwd, "main");
 let syncing = true;
 let logStream;
 
@@ -90,7 +90,7 @@ zingo.init().then(async () => {
         });
         console.log(`Waitlist length: ${waitlist.length}`); 
     }, 2 * 60 * 1000);
-});
+}).catch((err) => { console.log(err) });
 
 // Serve the Vue.js app
 // app.get('/', (req, res) => {
@@ -118,9 +118,8 @@ app.get('/balance', async (req, res) => {
     if(syncing) res.send('0.0');
     else {
         // Fetch total balance and return        
-        // const bal = await zingo.fetchTotalBalance();        
-        const bal = zingo.totalBalance;
-        res.send(`${bal.total.toFixed(8)}`);
+        const bal = await zingo.fetchTotalBalance();        
+        res.send(`${bal.toFixed(8)}`);
     }
 });
 
@@ -129,19 +128,28 @@ app.get('/log', async (req, res) => {
 });
 
 app.get('/txns', async (req, res) => {
-    // await zingo.fetchTandZandOTransactionsSummaries();
-    const txList = zingo.transactionsList.filter((t) => t.type == "Received")
-    res.json(txList.slice(0,10));
+    const txList = zingo.getTransactionsSummaries();    
+    const receivedTxns = txList.transaction_summaries
+        .filter((t) => t.kind == "received")
+        .map((tx) => {
+            return {
+                'value': (tx.value / 10**8),
+                'time': tx.datetime,
+                'memo': tx.orchard_notes ? tx.orchard_notes[0].memo : tx.sapling_notes ? tx.sapling_notes[0].memo : "No memo available"
+            }
+        });
+
+    res.json(receivedTxns.slice(0,10));
 });
 
 app.get('/stats', async (req, res) => {
-    await zingo.fetchTandZandOTransactionsSummaries();
-    const txList = zingo.transactionsList.filter((t) => t.type == "Sent")
+    const txList = zingo.getTransactionsSummaries(); 
+    const txSent = txList.transaction_summaries.filter((t) => t.kind == "sent");
     
-    const totalSent = txList.reduce((acc, el) => acc + el.txDetails[0].amount, 0);
-    const totalClaims = txList.length;
+    const totalSent = txSent.reduce((acc, el) => acc + el.value, 0);
+    const totalClaims = txSent.length;
     const result = {
-        sent: totalSent.toFixed(8),
+        sent: (totalSent / 10**8).toFixed(8),
         claims: totalClaims
     }
     res.json(result);
@@ -172,8 +180,8 @@ app.post('/add', async (req, res) => {
             const ipAddress = userIp.match(/(\d{1,3}\.\d{1,3}\.\d{1,3}\.\d{1,3})$/)[0];             
             try {
                 const proxyOrVpn = await axios.get(`http://check.getipintel.net/check.php?ip=${ipAddress}&contact=james.j.katz@protonmail.com`);
-                console.log("User blocked!");
                 if(proxyOrVpn.data >= 0.95) {
+                    console.log("User blocked!");
                     logStream.write(`${timeStamp .toISOString()} | Proxy or VPN blocked: ${ipAddress}\n\n`);
                     res.send('invalid-token');
                     return;
@@ -226,7 +234,7 @@ app.post('/add', async (req, res) => {
             const fee = await zingo.getDefaultFee();
             const queueSum = queue.map((el) => el.amount).reduce((acc, curr) => acc + curr, fee);
             
-            if(queueSum + sendJson[0].amount > (bal.total * 10**8)) {
+            if(queueSum + sendJson[0].amount > (bal * 10**8)) {
                 res.send('faucet-dry');
                 return;
             }            
@@ -257,8 +265,8 @@ app.post('/add', async (req, res) => {
 
 if(useHttps) {
     const options = {
-        key: fs.readFileSync('path_to_key.pem'),
-        cert: fs.readFileSync('path_to_cert.pem')
+        key: fs.readFileSync('privkey.pem'),
+        cert: fs.readFileSync('cert.pem')
     };
     https.createServer(options, app).listen(port);
     console.log(`App listening at https://localhost:${port}`)

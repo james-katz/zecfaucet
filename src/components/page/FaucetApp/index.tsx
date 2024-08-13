@@ -90,16 +90,18 @@ const FaucetApp: React.FC<FaucetAppProps> = ({darkMode, toggleDarkMode}) => {
     getFaucetPayout();
     getDonateAddress();
     getFaucetBalance();
-    getLatestDonations();
-    getFaucetStats();
+    // getLatestDonations();
+    // getFaucetStats();
 
 
     const updateFaucetBalanceInterval = setInterval(getFaucetBalance, 75 * 1000);
     const updateLatestDonationsInterval = setInterval(getLatestDonations, 75 * 1000);
+    const updateFaucetStatsInterval = setInterval(getFaucetStats, 75 * 1000);
 
     return () => {
       clearInterval(updateFaucetBalanceInterval);
       clearInterval(updateLatestDonationsInterval);
+      clearInterval(updateFaucetStatsInterval);
     };
   }, []);
 

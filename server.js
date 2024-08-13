@@ -112,15 +112,15 @@ app.get('/donate', async (req, res) => {
 
 app.get('/balance', async (req, res) => {
     // If syncing, return balance of 0.0
-    const ss = await zingo.doSyncStatus();
-    syncing = ss.in_progress;
+    // const ss = await zingo.doSyncStatus();
+    // syncing = ss.in_progress;
 
-    if(syncing) res.send('0.0');
-    else {
+    // if(syncing) res.send('0.0');
+    // else {
         // Fetch total balance and return        
         const bal = await zingo.fetchTotalBalance();        
         res.send(`${bal.toFixed(8)}`);
-    }
+    // }
 });
 
 app.get('/log', async (req, res) => {
@@ -131,15 +131,22 @@ app.get('/txns', async (req, res) => {
     const txList = zingo.getTransactionsSummaries();    
     const receivedTxns = txList.transaction_summaries
         .filter((t) => t.kind == "received")
-        .map((tx) => {
+        .map((tx) => {            
+            let memo = "No memo available";
+            if(tx.orchard_notes[0] && tx.orchard_notes[0].memo != null) {
+                memo = tx.orchard_notes[0].memo;
+            }
+            else if(tx.sapling_notes[0] && tx.sapling_notes[0].memo != null) {
+                memo = tx.sapling_notes[0].memo;
+            }
             return {
                 'value': (tx.value / 10**8),
                 'time': tx.datetime,
-                'memo': tx.orchard_notes ? tx.orchard_notes[0].memo : tx.sapling_notes ? tx.sapling_notes[0].memo : "No memo available"
+                'memo': memo
             }
         });
 
-    res.json(receivedTxns.slice(0,10));
+    res.json(receivedTxns.reverse().slice(0,10));
 });
 
 app.get('/stats', async (req, res) => {
@@ -147,7 +154,8 @@ app.get('/stats', async (req, res) => {
     const txSent = txList.transaction_summaries.filter((t) => t.kind == "sent");
     
     const totalSent = txSent.reduce((acc, el) => acc + el.value, 0);
-    const totalClaims = txSent.length;
+    const totalClaims = txSent.reduce((acc, el) => acc + el.outgoing_tx_data.length, 0);
+    
     const result = {
         sent: (totalSent / 10**8).toFixed(8),
         claims: totalClaims
@@ -176,9 +184,9 @@ app.post('/add', async (req, res) => {
             const userFp = req.body.fingerprint;
             const timeStamp = new Date();
             
-            // Check if user is using proxy/vpn
-            const ipAddress = userIp.match(/(\d{1,3}\.\d{1,3}\.\d{1,3}\.\d{1,3})$/)[0];             
+            // Check if user is using proxy/vpn            
             try {
+                const ipAddress = userIp.match(/(\d{1,3}\.\d{1,3}\.\d{1,3}\.\d{1,3})$/)[0];             
                 const proxyOrVpn = await axios.get(`http://check.getipintel.net/check.php?ip=${ipAddress}&contact=james.j.katz@protonmail.com`);
                 if(proxyOrVpn.data >= 0.95) {
                     console.log("User blocked!");

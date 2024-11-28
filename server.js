@@ -46,7 +46,7 @@ app.set("trust proxy", true);
 
 // Setup lib
 const lwd = "https://zec.rocks:443/";
-const zingo = new LiteWallet(lwd, "main");
+const zingo = new LiteWallet(lwd, "main", false);
 let syncing = true;
 let logStream;
 

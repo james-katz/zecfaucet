@@ -32,7 +32,7 @@ const RecentDonations: React.FC<RecentDonationsProps> = ({ donations }) => {
             {donations.map((donation, i) => (
               <Row key={i}>
                 <Td>{donation.value} ZEC</Td>
-                <Td>{new Date(donation.time * 1000).toLocaleDateString()}</Td>
+                <Td>{new Date(donation.time).toLocaleDateString()}</Td>
                 <Td>{donation.memo}</Td>
               </Row>
             ))}

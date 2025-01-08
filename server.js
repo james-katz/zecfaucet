@@ -283,6 +283,15 @@ app.post('/add', async (req, res) => {
                     res.send('invalid-token');
                     return;
                 }
+
+                // Also block sequential IP addresses based on the first 2 octets
+                let ipOctet = userIp.slice(0,15);
+                let seqIp = waitlist.filter((el) => el.ip.startsWith(ipOctet));
+                if(seqIp.length > 0) {
+                    logStream.write(`${timeStamp.toISOString()} | Sequential IP blocked: ${ipAddress}\n\n`);
+                    res.send('invalid-token');
+                    return;
+                }
             }
             catch(err) {
                 console.log("Couldn't check user ip for proxy or vpn.");
@@ -299,15 +308,6 @@ app.post('/add', async (req, res) => {
                     res.send(`greedy ${ Math.ceil(nextClaim) }`);                
                     return;
                 }   
-            }
-
-            // Also block sequential IP addresses based on the first 2 octets
-            let ipOctet = userIp.slice(0,15);
-            let seqIp = waitlist.filter((el) => el.ip.startsWith(ipOctet));
-            if(seqIp.length > 0) {
-                logStream.write(`${timeStamp.toISOString()} | Sequential IP blocked: ${ipAddress}\n\n`);
-                res.send('invalid-token');
-                return;
             }
 
             const pay = validAddr.address_kind === 'unified' ? u_payout.toFixed(4) : validAddr.address_kind === 'sapling' ? z_payout.toFixed(4) : 0;

@@ -186,8 +186,6 @@ app.get ('/payout', (req, res) =>{
 
 app.get('/donate', async (req, res) => {    
     const addr = await zingo.fetchAllAddresses();
-    // const seed = await zingo.getWalletSeed();
-    // console.log(seed);
     res.send(addr[0].address);
 });
 
@@ -203,25 +201,6 @@ app.get('/log', async (req, res) => {
 });
 
 app.get('/txns', async (req, res) => {
-    // const txList = zingo.getTransactionsSummaries();    
-    // const receivedTxns = txList.transaction_summaries
-    //     .filter((t) => t.kind == "received")
-    //     .map((tx) => {            
-    //         let memo = "No memo available";
-    //         if(tx.orchard_notes[0] && tx.orchard_notes[0].memo != null) {
-    //             memo = tx.orchard_notes[0].memo;
-    //         }
-    //         else if(tx.sapling_notes[0] && tx.sapling_notes[0].memo != null) {
-    //             memo = tx.sapling_notes[0].memo;
-    //         }
-    //         return {
-    //             'value': (tx.value / 10**8),
-    //             'time': tx.datetime,
-    //             'memo': memo
-    //         }
-    //     });
-
-    // res.json(receivedTxns.reverse().slice(0,10));
     const recentDonations = await Transaction.findAll({
         where: { kind: 'received' },
         order: [['createdAt', 'DESC']],
@@ -296,8 +275,8 @@ app.post('/add', async (req, res) => {
             catch(err) {
                 console.log("Couldn't check user ip for proxy or vpn.");
             }
-
-            const user = waitlist.filter(el => (el.ip === userIp || el.fp === userFp || el.address === addr));
+              
+            const user = waitlist.filter(el => (el.ip === userIp || el.fp === userFp || el.address === addr || el.sapling === addr));
             if(user.length > 0) {
                 const oldTimeStamp = user[0].timestamp;
                 const nextClaim = waittime - ((timeStamp - oldTimeStamp) / (1000*60));
@@ -340,9 +319,20 @@ app.post('/add', async (req, res) => {
             queue.push(sendJson[0]);
             console.log("New address added to the queue");
             
+            // If unified address, also extract it's sapling part
+            let saplingAddr;
+            if(validAddr.address_kind === 'unified') {
+                let decoded = zingo.decodeAddress(addr);
+                saplingAddr = decoded.sapling;                
+            }
+            else {
+                saplingAddr = addr;
+            }
+
             // Add user IP and browser firgerprint to the wait list
             waitlist.push({
                 address: addr,
+                sapling: saplingAddr,
                 ip: userIp,
                 fp: userFp,
                 timestamp: timeStamp

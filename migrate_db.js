@@ -47,7 +47,8 @@ async function migrate_db() {
                 const txClaims = tx.outgoing_tx_data;
                 for(const claim of txClaims) {
                     await txDb.createClaim({
-                        address: claim.address
+                        address: claim.address,
+                        createdAt: txTimestamp
                     });
                 }
             }

@@ -25,7 +25,7 @@ const { TxBuilder } = require('./zingolib-wrapper/utils/utils');
 // const { join } = require('path');
 
 const { initializeDatabase, Transaction, Claim } = require('./sequelize');
-
+const { Op } = require('sequelize');
 
 const app = express();
 const port = 2653;
@@ -161,13 +161,11 @@ zingo.init().then(async () => {
                     }
                     count += 1;
                 }
-
             }
         }
         else {
             console.log("No new donation");           
         }
-
     }, 2 * 60 * 1000);
 }).catch((err) => { console.log(err) });
 
@@ -175,6 +173,15 @@ zingo.init().then(async () => {
 // app.get('/', (req, res) => {
 //     res.sendFile(path.join(__dirname, 'dist', 'index.html'));
 // });
+
+function getClientIp(req) {
+    const xForwardedFor = req.headers['x-forwarded-for'];
+    if (xForwardedFor) {
+        // x-forwarded-for can contain multiple IPs, take the first one
+        return xForwardedFor.split(',')[0].trim();
+    }
+    return req.ip; // Fallback to req.ip if no x-forwarded-for header
+};
 
 app.get ('/payout', (req, res) =>{
     res.json({
@@ -192,8 +199,7 @@ app.get('/donate', async (req, res) => {
 app.get('/balance', async (req, res) => {    
     zingo.fetchTotalBalance().then((bal) => {
         res.send(`${bal}`);
-    })
-    
+    });
 });
 
 app.get('/log', async (req, res) => {
@@ -248,7 +254,7 @@ app.post('/add', async (req, res) => {
         }
         else if(validAddr) {
             // First, check if user can claim faucet
-            const userIp = req.ip; // TODO improve remote IP fetching
+            const userIp = getClientIp(req);
             const userFp = req.body.fingerprint;
             const timeStamp = new Date();
             
@@ -256,8 +262,8 @@ app.post('/add', async (req, res) => {
             try {
                 const ipAddress = userIp.match(/(\d{1,3}\.\d{1,3}\.\d{1,3}\.\d{1,3})$/)[0];             
                 const proxyOrVpn = await axios.get(`http://check.getipintel.net/check.php?ip=${ipAddress}&contact=james.j.katz@protonmail.com`);
-                if(proxyOrVpn.data >= 0.95) {
-                    console.log("User blocked!");
+                if(proxyOrVpn.data > 0.90) {
+                    console.log("VPN/Proxy detected. User blocked!");
                     logStream.write(`${timeStamp.toISOString()} | Proxy or VPN blocked: ${ipAddress}\n\n`);
                     res.send('invalid-token');
                     return;
@@ -274,6 +280,43 @@ app.post('/add', async (req, res) => {
             }
             catch(err) {
                 console.log("Couldn't check user ip for proxy or vpn.");
+            }
+
+            // Blacklist some addresses
+            try {
+                // Get total times this address has claimed from the faucet
+                let totalClaims = await Claim.count({
+                    where: {
+                        address: addr
+                    }
+                });
+
+                // Get how many times this address claimed in the last 24 h ours
+                let recentClaims = await Claim.count({
+                    where: {
+                        address: addr,
+                        createdAt: {
+                            [Op.gte]: new Date(new Date() - 24 * 60 * 60 * 1000) // 24 hours ago
+                        }
+                    }
+                });
+                
+                // Reject if `totalClaims` is larger or equal than 100 (permanent blacklist)
+                // or `recentClaims`is larger than 4 (temporary blacklist)
+                if(totalClaims >= 100 || recentClaims > 4) {
+                    console.log(`Blacklist address blocked!`);
+                    console.log(`totalClaims: ${totalClaims}`);
+                    console.log(`recentClaims: ${recentClaims}`);
+
+                    logStream.write(`${timeStamp.toISOString()} | Blacklisted address: ${addr}\n\n`);
+
+                    // Reject with `invalid-token`, so attacker don't know the exact reason the claim was rejected
+                    res.send('invalid-token');
+                    return;
+                }
+            }
+            catch(err) {
+                console.log("Error getting address claims.");
             }
               
             const user = waitlist.filter(el => (el.ip === userIp || el.fp === userFp || el.address === addr || el.sapling === addr));

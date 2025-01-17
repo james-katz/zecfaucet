@@ -128,7 +128,7 @@ zingo.init().then(async () => {
 
         const lastTxid = zingo.fetchLastTxId();
 
-        if(lastDbTxid[0].txid != lastTxid) {                   
+        if(lastTxid && lastDbTxid[0] && lastDbTxid[0].txid != lastTxid) {                   
             const txSummaries = await zingo.getTransactionsSummaries();
             const walletTxns = txSummaries.transaction_summaries.reverse();
             let count = 0;

@@ -9,9 +9,10 @@ async function migrate_db() {
     dotenv.config();
 
     const lwd_url = process.env.LWD_URL;
+    const network = process.env.NETWORK;
 
     // initialize zingolib
-    const zingo = new LiteWallet(lwd_url, "main", false);
+    const zingo = new LiteWallet(lwd_url, network, false);
     zingo.init().then(async () => {    
         // fetch all transactions
         const txList = zingo.getTransactionsSummaries();  

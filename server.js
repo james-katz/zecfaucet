@@ -16,6 +16,7 @@ dotenv.config();
 const {verify} = require('hcaptcha');
 
 const lwd_url = process.env.LWD_URL;
+const network = process.env.NETWORK;
 const hc_secret = process.env.HCAPTCHA_SECRET;
 
 const useHttps = false;
@@ -30,10 +31,11 @@ const { Op } = require('sequelize');
 const app = express();
 const port = 2653;
 
-// Set faucet payout in decimal ZEC
-const u_payout = 0.0005;
-const z_payout = 0.0004;
-const t_payout = 0.0003;
+// Set faucet payout in decimal ZEC (Mainnet / Testenet)
+const u_payout = network == "main" ? 0.0005 : 0.005;
+const z_payout = network == "main" ? 0.0004 : 0.004;
+const t_payout = network == "main" ? 0.0003 : 0.003;
+
 const memo = "Thanks for using ZecFaucet.com"
 
 // Queue for the faucet payout
@@ -50,7 +52,7 @@ app.set("trust proxy", true);
 // app.use(express.static(path.join(__dirname, 'dist')));
 
 // Setup lib
-const zingo = new LiteWallet(lwd_url, "main", false);
+const zingo = new LiteWallet(lwd_url, network, false);
 let syncing = true;
 let logStream;
 
@@ -183,6 +185,12 @@ function getClientIp(req) {
     return req.ip; // Fallback to req.ip if no x-forwarded-for header
 };
 
+app.get ('/network', (req, res) =>{
+    res.json({
+        net: network
+    });
+});
+
 app.get ('/payout', (req, res) =>{
     res.json({
         u_pay: u_payout,
@@ -252,7 +260,7 @@ app.post('/add', async (req, res) => {
             res.send("invalid-token");
             return;
         }
-        else if(validAddr) {
+        else if(validAddr && validAddr.chain_name == network) {
             // First, check if user can claim faucet
             const userIp = getClientIp(req);
             const userFp = req.body.fingerprint;
@@ -333,9 +341,9 @@ app.post('/add', async (req, res) => {
                 return;
             }
 
-            const pay = validAddr.address_kind === 'unified' ? u_payout.toFixed(4) : validAddr.address_kind === 'sapling' ? z_payout.toFixed(4) : 0;
+            const pay = validAddr.address_kind === 'unified' ? u_payout.toFixed(4) : validAddr.address_kind === 'sapling' ? z_payout.toFixed(4) : t_payout.toFixed(4);
             // Reject if it's transparent address
-            if(pay == 0) {
+            if(pay == t_payout && network == "main") {
                 res.send("transparent");
                 return;
             }
@@ -365,7 +373,7 @@ app.post('/add', async (req, res) => {
             
             // If unified address, also extract it's sapling part
             let saplingAddr;
-            if(validAddr.address_kind === 'unified') {
+            if(validAddr.address_kind === 'unified' && network == "main") {
                 let decoded = zingo.decodeAddress(addr);
                 saplingAddr = decoded.sapling;                
             }

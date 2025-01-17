@@ -28,6 +28,7 @@ interface FaucetAppProps {
 const FaucetApp: React.FC<FaucetAppProps> = ({darkMode, toggleDarkMode}) => {
   const [balance, setBalance] = useState<number>(0);
   const [payout, setPayout] = useState<Payout>({ u: 0, z: 0, t: 0 });
+  const [testnet, setTestnet] = useState<boolean>(false);
   const [donate, setDonate] = useState<string>('');
   const [donations, setDonations] = useState<[]>([]); 
   const [stats, setStats] = useState<Stats>({ sent: 0, claims: 0 });
@@ -46,6 +47,10 @@ const FaucetApp: React.FC<FaucetAppProps> = ({darkMode, toggleDarkMode}) => {
           console.error('Error fetching faucet payout:', error);
         });
     };
+
+    // const getFaucetNetwork = () => {
+      
+    // };
 
     const getDonateAddress = () => {
       http.get('/donate')
@@ -92,6 +97,7 @@ const FaucetApp: React.FC<FaucetAppProps> = ({darkMode, toggleDarkMode}) => {
     getFaucetBalance();
     getLatestDonations();
     getFaucetStats();
+    // getFaucetNetwork();
 
     const updateFaucetBalanceInterval = setInterval(getFaucetBalance, 75 * 1000);
     const updateLatestDonationsInterval = setInterval(getLatestDonations, 75 * 1000);
@@ -104,6 +110,17 @@ const FaucetApp: React.FC<FaucetAppProps> = ({darkMode, toggleDarkMode}) => {
     };
   }, []);
 
+  useEffect(() => {
+    http.get('/network')
+    .then((res) => {
+      setTestnet(res.data.net === "test");
+    })
+    .catch((error) => {
+      console.error('Error fetching faucet network:', error);
+    });
+    console.log("Testnet updated:", testnet);
+  }, [testnet]);
+
   
   return (
     <Container >
@@ -111,12 +128,12 @@ const FaucetApp: React.FC<FaucetAppProps> = ({darkMode, toggleDarkMode}) => {
         {darkMode ? <FaSun /> : <FaMoon />} 
       </ToggleButton>
       <Image alt="ZecFaucet.com" src={zecFaucetImage} />
-      <Header>Welcome to ZecFaucet.com</Header>
+      <Header>Welcome to {testnet ? "testnet." : ""}ZecFaucet.com</Header>
 
-      <ReceiveZec payout={payout} />
-      <FaucetBalance balance={balance} donate={donate} />
-      <FaucetStats stats={stats}  />
-      <RecentDonations donations={donations} />
+      <ReceiveZec payout={payout} testnet={testnet} />
+      <FaucetBalance balance={balance} donate={donate} testnet={testnet} />
+      <FaucetStats stats={stats} testnet={testnet} />
+      <RecentDonations donations={donations} testnet={testnet} />
 
       <Row>
         <CoinTickerWidget coinId="zcash" currency="usd" locale="pt" />

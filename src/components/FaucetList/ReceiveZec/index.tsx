@@ -7,14 +7,15 @@ import HCaptcha from '@hcaptcha/react-hcaptcha';
 interface Payout {
   u: number;
   z: number;
+  t: number;
 }
 
 interface ReceiveZecProps {
   payout: Payout;
-  
+  testnet: boolean;
 }
 
-const ReceiveZec: React.FC<ReceiveZecProps> = ({ payout }) => {
+const ReceiveZec: React.FC<ReceiveZecProps> = ({ payout, testnet }) => {
   const [address, setAddress] = useState<string>('');
   const [receive, setReceive] = useState<number>(0);
   const [fingerprint, setFingerprint] = useState<string>(''); 
@@ -30,6 +31,7 @@ const ReceiveZec: React.FC<ReceiveZecProps> = ({ payout }) => {
   const [solveCaptcha, setSolveCaptcha] = useState<boolean>(false);
   const [invalidCaptcha, setInvalidCaptcha] = useState<boolean>(false);
   const [verified, setVerified] = useState<boolean>(false);
+  const [coin, setCoin] = useState<String>('');
 
   useEffect(() => {
     const opt = {
@@ -39,7 +41,9 @@ const ReceiveZec: React.FC<ReceiveZecProps> = ({ payout }) => {
     };
     const fp = getBrowserFingerprint(opt);
     setFingerprint(fp); 
-  }, []);
+    setCoin(testnet ? "TAZ" : "ZEC")
+    console.log("asdkghfhjasgfhjasdf", testnet)
+  }, [testnet]);
 
   const handleClaim = () => {
     setDisableBtn(true);
@@ -92,10 +96,10 @@ const ReceiveZec: React.FC<ReceiveZecProps> = ({ payout }) => {
 
   return (
     <Container>
-      <Heading>Enter your Zcash address to receive up to {payout.u} ZEC:</Heading>
-      <SubHeading>* Receive {payout.u} ZEC if using Orchard address <Tooltip>[?] <span className="tooltiptext">An Unified / Orchard address looks like this: u1h0dh...2llr</span> </Tooltip></SubHeading>
-      <SubHeading>* Receive {payout.z} ZEC if using Sapling address <Tooltip>[?] <span className="tooltiptext">A Sapling address looks like this: zs1sf0...x583</span> </Tooltip></SubHeading>
-      <SubHeading>* ZecFaucet does not send to transparent addresses. <Tooltip>[?] <span className="tooltiptext">A Transparent address looks like this: t1KPhq...BaQw</span> </Tooltip></SubHeading>
+      <Heading>Enter your Zcash address to receive up to {payout.u} {coin}:</Heading>
+      <SubHeading>* Receive {payout.u} {coin} if using Orchard address <Tooltip>[?] <span className="tooltiptext">An Unified / Orchard address looks like this: u1h0dh...2llr</span> </Tooltip></SubHeading>
+      <SubHeading>* Receive {payout.z} {coin} if using Sapling address <Tooltip>[?] <span className="tooltiptext">A Sapling address looks like this: zs1sf0...x583</span> </Tooltip></SubHeading>
+      <SubHeading>* {testnet ? `Receive ${payout.t} ${coin} if using Transparent address` : "ZecFaucet does not send to transparent addresses"} <Tooltip>[?] <span className="tooltiptext">A Transparent address looks like this: t1KPhq...BaQw</span> </Tooltip></SubHeading>
       <Paragraph>Visit <a href="https://zechub.wiki/guides/visualizing-zcash-addresses" target="_blank" rel="noopener noreferrer">ZecHub wiki</a> to learn more about Zcash addresses.</Paragraph>
       <Paragraph>Don't have a Zcash wallet? Find the best wallet <a href="https://zechub.wiki/wallets" target="_blank" rel="noopener noreferrer">here</a>.</Paragraph>      
       <P>ZecFaucet recommended wallet: <a href="https://electriccoin.co/zashi/" target="_blank" rel="noopener noreferrer">Zashi.</a></P>

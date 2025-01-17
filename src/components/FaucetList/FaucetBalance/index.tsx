@@ -4,13 +4,14 @@ import { DonateHeading, DonationAddress, DonationQR, FaucetBalanceSpan, Heading2
 interface FaucetBalanceProps {
   balance: number;
   donate: string;
+  testnet: boolean;
 }
 
-const FaucetBalance: React.FC<FaucetBalanceProps> = ({ balance, donate }) => {
+const FaucetBalance: React.FC<FaucetBalanceProps> = ({ balance, donate, testnet }) => {
     return (
         <Row>
           <Heading2>Faucet balance:</Heading2>
-          <FaucetBalanceSpan>{balance} ZEC</FaucetBalanceSpan>
+          <FaucetBalanceSpan>{balance} {testnet ? "TAZ" : "ZEC"}</FaucetBalanceSpan>
     
           <DonateHeading>Donate to ZecFaucet.com:</DonateHeading>
           <DonationQR>

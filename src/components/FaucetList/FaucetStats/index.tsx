@@ -8,14 +8,15 @@ interface Stats {
 
 interface FaucetStatsProps {
   stats: Stats;
+  testnet: boolean;
 }
 
-const FaucetStats: React.FC<FaucetStatsProps> = ({ stats }) => {
+const FaucetStats: React.FC<FaucetStatsProps> = ({ stats, testnet }) => {
   return (
     <Row>
     <h2>Faucet Statistics:</h2>
     <StatsContainer>
-      <StatsTitle>Total ZEC sent</StatsTitle>
+      <StatsTitle>Total {testnet ? "TAZ" : "ZEC"} sent</StatsTitle>
       <StatsValue>{stats.sent}</StatsValue>
     </StatsContainer>
     <StatsContainer>

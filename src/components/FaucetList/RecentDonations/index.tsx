@@ -13,9 +13,11 @@ interface Donation {
 
 interface RecentDonationsProps {
   donations: Donation[];
+  testnet: boolean;
+
 }
 
-const RecentDonations: React.FC<RecentDonationsProps> = ({ donations }) => {
+const RecentDonations: React.FC<RecentDonationsProps> = ({ donations, testnet }) => {
   return (
     <Container>
       <Donations>Recent donations:</Donations>
@@ -31,7 +33,7 @@ const RecentDonations: React.FC<RecentDonationsProps> = ({ donations }) => {
           <tbody>
             {donations.map((donation, i) => (
               <Row key={i}>
-                <Td>{donation.value} ZEC</Td>
+                <Td>{donation.value} {testnet ? "TAZ" : "ZEC"}</Td>
                 <Td>{new Date(donation.time).toLocaleDateString()}</Td>
                 <Td>{donation.memo}</Td>
               </Row>

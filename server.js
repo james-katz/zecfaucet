@@ -32,11 +32,11 @@ const app = express();
 const port = 2653;
 
 // Set faucet payout in decimal ZEC (Mainnet / Testenet)
-const u_payout = network == "main" ? 0.0005 : 0.005;
-const z_payout = network == "main" ? 0.0004 : 0.004;
-const t_payout = network == "main" ? 0.0003 : 0.003;
+const u_payout = network == "main" ? 0.0005 : 0.1;
+const z_payout = network == "main" ? 0.0004 : 0.09;
+const t_payout = network == "main" ? 0.0003 : 0.08;
 
-const memo = "Thanks for using ZecFaucet.com"
+const memo = `Thanks for using ${network == 'test' ? 'testnet.' : ''} ZecFaucet.com`
 
 // Queue for the faucet payout
 let queue = [];
@@ -157,6 +157,14 @@ zingo.init().then(async () => {
                             createdAt: txTimestamp
                         });
                         console.log(`New donation of ${tx.value / 10**8} received!\nMessage: ${txMemo}`);
+
+                        if(network == "test") {
+                            isTransparent = tx.transparent_coins;
+                            if(isTransparent) {
+                                console.log("Assuming transparent donation as coinbase transaction. Must shield before spending.")
+                                await zingo.shieldTransparent();
+                            }
+                        }
                     }
                     catch {
                         console.log("Couldn't insert donation into db ...");

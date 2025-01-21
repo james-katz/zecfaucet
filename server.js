@@ -158,13 +158,13 @@ zingo.init().then(async () => {
                         });
                         console.log(`New donation of ${tx.value / 10**8} received!\nMessage: ${txMemo}`);
 
-                        if(network == "test") {
-                            isTransparent = tx.transparent_coins;
-                            if(isTransparent) {
-                                console.log("Assuming transparent donation as coinbase transaction. Must shield before spending.")
-                                await zingo.shieldTransparent();
-                            }
-                        }
+                        // if(network == "test") {
+                        //     isTransparent = tx.transparent_coins;
+                        //     if(isTransparent) {
+                        //         console.log("Assuming transparent donation as coinbase transaction. Must shield before spending.")
+                        //         await zingo.shieldTransparent();
+                        //     }
+                        // }
                     }
                     catch {
                         console.log("Couldn't insert donation into db ...");

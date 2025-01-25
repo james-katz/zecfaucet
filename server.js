@@ -157,14 +157,6 @@ zingo.init().then(async () => {
                             createdAt: txTimestamp
                         });
                         console.log(`New donation of ${tx.value / 10**8} received!\nMessage: ${txMemo}`);
-
-                        // if(network == "test") {
-                        //     isTransparent = tx.transparent_coins;
-                        //     if(isTransparent) {
-                        //         console.log("Assuming transparent donation as coinbase transaction. Must shield before spending.")
-                        //         await zingo.shieldTransparent();
-                        //     }
-                        // }
                     }
                     catch {
                         console.log("Couldn't insert donation into db ...");
@@ -176,7 +168,7 @@ zingo.init().then(async () => {
         else {
             console.log("No new donation");           
         }
-    }, 2 * 60 * 1000);
+    }, 4 * 60 * 1000);
 }).catch((err) => { console.log(err) });
 
 // Serve the Vue.js app
@@ -224,7 +216,12 @@ app.get('/log', async (req, res) => {
 
 app.get('/txns', async (req, res) => {
     const recentDonations = await Transaction.findAll({
-        where: { kind: 'received' },
+        where: { 
+            kind: 'received',
+            value: {
+                [Op.gte]: 50000
+            }
+         },
         order: [['createdAt', 'DESC']],
         limit: 10
     });
@@ -309,8 +306,8 @@ app.post('/add', async (req, res) => {
                 });
                 
                 // Reject if `totalClaims` is larger or equal than 100 (permanent blacklist)
-                // or `recentClaims`is larger than 4 (temporary blacklist)
-                if(totalClaims >= 100 || recentClaims > 4) {
+                // or `recentClaims`is larger than 2 (temporary blacklist)
+                if(totalClaims >= 100 || recentClaims > 2) {
                     console.log(`Blacklist address blocked!`);
                     console.log(`totalClaims: ${totalClaims}`);
                     console.log(`recentClaims: ${recentClaims}`);
@@ -350,7 +347,7 @@ app.post('/add', async (req, res) => {
             }
 
             const pay = validAddr.address_kind === 'unified' ? u_payout.toFixed(4) : validAddr.address_kind === 'sapling' ? z_payout.toFixed(4) : t_payout.toFixed(4);
-            // Reject if it's transparent address
+            // Reject if it's transparent address (mainnet)
             if(pay == t_payout && network == "main") {
                 res.send("transparent");
                 return;

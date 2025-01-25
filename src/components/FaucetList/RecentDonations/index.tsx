@@ -21,6 +21,7 @@ const RecentDonations: React.FC<RecentDonationsProps> = ({ donations, testnet })
   return (
     <Container>
       <Donations>Recent donations:</Donations>
+      <p>(Filtering spam)</p>
       <List>
         <Table>
           <thead>

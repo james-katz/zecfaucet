@@ -1,0 +1,159 @@
+.stats-section {
+    position: relative;
+    display: flex;
+    flex-direction: row;
+    height: 100vh;
+    /* overflow: hidden; */
+}
+
+/* Add horizontal lines using pseudo-elements */
+.stats-section::before,
+.stats-section::after {
+  content: '';
+  position: absolute;
+  left: 0;
+  width: 100%;
+  height: 8px; /* or 1px for subtle */
+  background: linear-gradient(to right, #f2b200, #fff, #f2b200); /* or solid #f2b200 */
+  z-index: 3;
+  margin-top: 64px;
+  margin-bottom: 64px;
+}
+
+.stats-section::before {
+  top: 0;
+}
+
+.stats-section::after {
+  bottom: 0;
+}
+  
+.stats-left,
+.stats-right {
+    flex: 1;
+    position: relative;
+    background-color: #efefef;
+    align-items: center;
+    justify-content: center;
+    overflow: hidden;
+}
+  
+/* yellow div that slides in and out */
+.yellow-swipe {
+    position: absolute;
+    top: 0;
+    left: 0;
+    height: 100%;
+    width: 100%;
+    background: #f2b200;
+    z-index: 1;
+    will-change: transform;
+}
+  
+.stats-left-content,
+.stats-right-content {
+    position: relative;
+    z-index: 2;
+    padding: 2rem;
+    color: rgb(74, 74, 74);
+    display: flex;
+    flex-direction: column;    
+    margin-left: 3rem;
+    padding-top: 4rem;
+}
+
+.stats-left-content h2 {
+  font-size: 4rem;
+  line-height: 3.6rem;  
+  margin-bottom: 4rem;
+}
+
+.stats-right-content h2 {
+  font-size: 4rem;
+  line-height: 3.6rem;  
+  margin-bottom: 2rem;
+}
+
+.stats-left-content h3 {
+  font-size: 2.4rem;
+  margin-bottom: 2.4rem;
+  margin-top: 0px;
+  color: #efefef;
+}
+
+.stats-left-content p {
+  font-size: 2rem;
+  margin-bottom: 0;
+  margin-top: 0px;
+  font-weight: bold;
+}
+
+/* .stats-right {  
+  overflow-y: auto;
+} */
+
+.donations-table {
+  width: 100%;
+  border-collapse: collapse;
+  /* margin-top: 2rem; */
+}
+
+
+.donations-table td {
+  border: 1px solid #ddd;
+  padding: 0.75rem;
+  text-align: left;
+}
+.donations-table td {
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  max-width: 200px; /* or whatever limit you want */
+}
+
+.donations-table th {
+  background-color: #f2b200;
+  color: #fff;
+  padding: 0.75rem;
+}
+
+@media (max-width: 768px) {
+  .stats-section {
+    flex-direction: column;
+    height: auto;              /* 👈 allow content to grow */
+    min-height: 100vh;         /* 👈 optional: still fill screen */
+    
+  }
+
+  .stats-right {  
+    overflow-y: scroll;
+  }
+
+  .stats-left-content,
+  .stats-right-content {
+    padding: 1rem;
+    justify-content: baseline;
+    overflow-y: scroll;
+    margin:0;
+  }
+  
+  .stats-left-content h2{
+    font-size: 2rem;;
+    line-height: 1.8rem;  
+  }
+
+  .stats-right-content h2{
+    font-size: 2rem;;
+    line-height: 1.8rem;  
+  }
+
+  .stats-right-content code {
+    overflow: hidden;
+    font-size: 0.8rem;
+  }
+
+  .stats-section::before,
+  .stats-section::after {
+    display: none;
+  }
+}

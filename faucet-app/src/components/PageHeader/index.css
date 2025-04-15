@@ -1,0 +1,126 @@
+.header-wrapper {
+    position: relative;
+    height: 100vh;
+    /* overflow: hidden; */
+    max-width: 1280PX; /* or 960px if you want tighter layout */
+    margin: 0 auto;
+    
+    width: 100%;
+    box-sizing: border-box;
+}
+
+.header-video-bg {
+    position: absolute;
+    top: 0;
+    left: 0;
+    height: 100%;
+    width: 100%;
+    object-fit: cover;
+    z-index: -1;
+}
+
+.header {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    /* padding: 4rem; */
+    /* padding: 2rem 4rem 0 4rem; */
+    /* background-color: #efefef; */
+    /* height: 100vh; */
+    flex-wrap: nowrap; /* Important: prevent wrapping */
+    margin: 0;
+    overflow-x: hidden;
+    background-size: cover;
+}
+  
+.header-text {
+    flex: 0 0 60%;
+    /* max-width: 60%; */
+    margin:0;
+    /* z-index: 10; */
+}
+    
+.header-text h1 {
+    font-size: 5rem;
+    margin-bottom: 1.5rem;    
+    line-height: 4.5rem;
+    font-weight: bold;
+}
+
+.header-text p {
+    font-size: 2rem;
+    margin: 0;    
+}
+  
+.header-text .warning {
+    font-weight: bold;
+    font-size: 1.5rem;
+    margin-top: 1rem;
+}
+  
+.header-logo {    
+    flex: 0 0 40%;
+    max-width: 40%;
+    height: 100%;
+    display: flex;
+    justify-content: center;    
+    /* overflow: hidden; */
+}
+
+.header-logo-mobile {    
+    display: none;
+}
+
+.header-logo img {
+    height: 90%;   /* 👈 HUGE logo! */
+    max-width: 550px;  /* Allows it to scale nicely */
+    width: auto;
+    display: block;
+}
+
+.receive-address {
+    list-style: none;
+    font-size: 1.5rem;    
+}
+
+.receive-address li{
+    margin-bottom: 0.6rem;
+}
+  
+/* Hide logo on mobile */
+@media (max-width: 768px) {
+    .header {
+        padding: 0 1rem;
+        flex-wrap: wrap; /* allow wrapping on small screens */
+        /* background-image: url('../../images/zecfaucet_2.0.gif'); */
+    }
+      
+    .header-logo {
+        display: none;
+    }
+
+    .header-logo-mobile {    
+        display: flex;     
+        min-width: 100%;                
+        padding-top: 1.2rem;
+    }
+
+    .header-logo-mobile img {
+        max-width: 8rem;
+        height: auto;        
+    }
+      
+    .header-text {
+        /* flex: 1 1 100%; */
+        max-width: 100%;
+    }
+
+    .header-text h1 {
+        flex: 1 1 100%;
+        font-size: 3rem;
+        line-height: 3.5rem;
+    }
+}
+
+
+  

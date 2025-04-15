@@ -1,0 +1,27 @@
+body {
+    font-family: 'Roboto', 'Helvetica Neue', Arial, sans-serif;
+}
+
+body, html {
+    margin: 0;
+    padding: 0;
+    /* overflow-x: hidden; */
+}
+
+/* html, body {
+    scroll-snap-type: y proximity;
+    overflow-y: scroll;
+    height: 100vh;
+} */
+
+/* .scroll-container {
+    scroll-snap-type: y proximity;
+    overflow-y: scroll;
+    height: 100vh;
+} */
+
+.snap-section {
+    scroll-snap-align: start;   
+    height: 100vh;
+    min-height: 100vh;
+}

@@ -1,0 +1,50 @@
+.about-section {
+    position: relative;
+    display: flex;
+    height: 100vh;
+    overflow: hidden;
+}
+
+.about-faucet {
+    display: flex;
+    flex-direction: column;    
+    height: 100%;
+    text-align: center;
+    justify-content: space-between; /* 👈 this does the magic! */
+    /* width: 100%; */
+    padding: 0 6rem;
+    background-color: #efefef;
+}
+
+.about-faucet h2 {
+    font-size: 4rem;    
+    color: #6d6d6d;
+}
+
+.about-faucet p {
+    font-size: 1.6rem;
+    color: #6d6d6d;
+    flex: 1;
+}
+
+.about-faucet h3 {
+    font-size: 1.8rem;
+    color: #6d6d6d;
+}
+
+@media (max-width: 768px) {
+    .about-section {
+      flex-direction: column;
+      height: auto;              /* 👈 allow content to grow */
+      min-height: 100vh;         /* 👈 optional: still fill screen */      
+    }
+
+    .about-faucet {
+        padding: 0 1rem;        
+    }
+
+    .about-faucet h2 {
+        font-size: 3.2rem;
+    }
+  
+  }

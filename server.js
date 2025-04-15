@@ -1,4 +1,4 @@
-// const { Worker } = require('worker_threads');
+const { Worker } = require('worker_threads');
 
 const express = require('express');
 const bodyParser = require('body-parser')
@@ -13,13 +13,10 @@ const path = require('path');
 const dotenv = require('dotenv');
 dotenv.config();
 
-const {verify} = require('hcaptcha');
-
 const lwd_url = process.env.LWD_URL;
 const network = process.env.NETWORK;
-const hc_secret = process.env.HCAPTCHA_SECRET;
 
-const useHttps = false;
+const useHttps = process.env.USE_HTTPS === "true";
 
 const LiteWallet = require('./zingolib-wrapper/zingolib');
 const { TxBuilder } = require('./zingolib-wrapper/utils/utils');
@@ -32,9 +29,9 @@ const app = express();
 const port = 2653;
 
 // Set faucet payout in decimal ZEC (Mainnet / Testenet)
-const u_payout = network == "main" ? 0.0005 : 0.1;
-const z_payout = network == "main" ? 0.0004 : 0.09;
-const t_payout = network == "main" ? 0.0003 : 0.08;
+const u_payout = network == "main" ? 0.0005 : 0.3;
+const z_payout = network == "main" ? 0.0004 : 0.2;
+const t_payout = network == "main" ? 0.0003 : 0.1;
 
 const memo = `Thanks for using ${network == 'test' ? 'testnet.' : ''} ZecFaucet.com`
 
@@ -48,10 +45,7 @@ app.use(bodyParser.json()) // to convert the request into JSON
 app.use(cors()) // to allow cross origin requests
 app.set("trust proxy", true);
 
-// Serve static files from the 'dist' directory
-// app.use(express.static(path.join(__dirname, 'dist')));
-
-// Setup lib
+// Setup zingolib
 const zingo = new LiteWallet(lwd_url, network, false);
 let syncing = true;
 let logStream;
@@ -64,7 +58,7 @@ zingo.init().then(async () => {
     // Start the logger
     logStream = fs.createWriteStream("log.txt", {flags:'a'});
 
-    // Send payments every 2 minutes
+    // Send payments every 3 minutes
     const timerID = setInterval(async() => {
         const sendProgress = zingo.isSending;
         const notes = await zingo.fetchNotes();
@@ -171,11 +165,6 @@ zingo.init().then(async () => {
     }, 4 * 60 * 1000);
 }).catch((err) => { console.log(err) });
 
-// Serve the Vue.js app
-// app.get('/', (req, res) => {
-//     res.sendFile(path.join(__dirname, 'dist', 'index.html'));
-// });
-
 function getClientIp(req) {
     const xForwardedFor = req.headers['x-forwarded-for'];
     if (xForwardedFor) {
@@ -260,7 +249,7 @@ app.post('/add', async (req, res) => {
         const addr = req.body.address;
         const validAddr = await zingo.parseAddress(addr);    
         const token = req.body.token;
-        const validToken = await verify(hc_secret, token);
+        const validToken = true;
         if(!validToken.success) {
             res.send("invalid-token");
             return;
@@ -295,7 +284,7 @@ app.post('/add', async (req, res) => {
                     }
                 });
 
-                // Get how many times this address claimed in the last 24 h ours
+                // Get how many times this address claimed in the last 24 hours
                 let recentClaims = await Claim.count({
                     where: {
                         address: addr,
@@ -306,8 +295,8 @@ app.post('/add', async (req, res) => {
                 });
                 
                 // Reject if `totalClaims` is larger or equal than 100 (permanent blacklist)
-                // or `recentClaims`is larger than 2 (temporary blacklist)
-                if(totalClaims >= 100 || recentClaims > 2) {
+                // or `recentClaims`is larger than 8 (temporary blacklist)
+                if(totalClaims >= 100 || recentClaims > 8) {
                     console.log(`Blacklist address blocked!`);
                     console.log(`totalClaims: ${totalClaims}`);
                     console.log(`recentClaims: ${recentClaims}`);

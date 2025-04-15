@@ -1,0 +1,167 @@
+.donate-section {
+    position: relative;
+    display: flex;
+    flex-direction: row;
+    height: 100vh;
+    /* overflow: hidden; */
+
+}
+
+/* Add horizontal lines using pseudo-elements */
+.donate-section::before,
+.donate-section::after {
+  content: '';
+  position: absolute;
+  left: 0;
+  width: 100%;
+  height: 8px; /* or 1px for subtle */
+  background: linear-gradient(to right, #f2b200, #fff, #f2b200); /* or solid #f2b200 */
+  z-index: 3;
+  margin-top: 64px;
+  margin-bottom: 64px;
+}
+
+/* .donate-section::before {
+  top: 0;
+}
+
+.donate-section::after {
+  bottom: 0;
+} */
+  
+.donate-left,
+.donate-right {  
+    flex: 1;
+    position: relative;
+    background-color: #f2b200; /* mustard yellow */
+    align-items: center;
+    justify-content: center;
+    overflow: hidden;
+}
+  
+/* White div that slides in and out */
+.white-swipe {
+    position: absolute;
+    top: 0;
+    left: 0;
+    height: 100%;
+    width: 100%;
+    background: #efefef;
+    z-index: 1;
+    will-change: transform;
+}
+  
+.donate-left-content {
+    position: relative;
+    z-index: 2;
+    padding: 2rem;
+    color: black;
+    display: flex;
+    flex-direction: column;    
+    margin-left: 3rem;
+    padding-top: 4rem;
+    overflow: hidden;
+}
+
+.donate-left-content h2 {
+  font-size: 4rem;
+  line-height: 3.6rem;  
+  margin-bottom: 2rem;
+}
+
+.donate-left-content h3 {
+  font-size: 3rem;
+  margin-bottom: 0;
+  margin-top: 0px;
+}
+
+.donate-left-content p {
+  font-size: 2rem;
+  margin-bottom: 1rem;
+  margin-top: 0px;
+  font-weight: bold;
+}
+
+.donate-address {
+  max-width: 45%;
+  height: auto;
+  margin-bottom: 0.5rem;
+  padding-bottom: 0.5rem;
+}
+  
+.donate-right-content {
+  z-index: 2;
+  padding: 2rem 3rem;
+  color: black;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  height: 100%;
+  text-align: center;
+  overflow: hidden;
+}
+
+.donate-right-content code {
+  white-space: pre-wrap;
+  word-break: break-word;
+  max-width: 64ch; /* Adjust as needed */
+  margin-top: 1rem;
+  font-size: 1.5rem;
+  padding: 32px;
+  border-radius: 16px;
+  background-color: rgba(255, 255, 255, 0.2);
+}
+
+.copy-button {
+  margin-top: 2rem;
+  background-color: #333;
+  color: white;
+  font-weight: bold;
+  padding: 0.8rem 2rem;
+  border-radius: 2rem;
+  border: none;
+  cursor: pointer;
+  transition: background 0.3s ease;
+}
+
+.copy-button:hover {
+  background-color: #555;
+}
+
+@media (max-width: 768px) {
+  .donate-section {
+    flex-direction: column;
+    height: auto;              /* 👈 allow content to grow */
+    min-height: 100vh;         /* 👈 optional: still fill screen */
+    
+  }
+
+  .donate-left-content,
+  .donate-right-content {
+    padding: 2rem;
+    margin: 0;
+    justify-content: baseline;
+  }
+  
+  .donate-left-content h2{
+    font-size: 2rem;;
+    line-height: 1.8rem;
+  }
+
+  .donate-left-content h3{
+    font-size: 2rem;;
+    line-height: 1.8rem;
+  }
+
+  .donate-right-content code {
+    overflow: hidden;
+    font-size: 0.8rem;
+    max-width: 300px
+  }
+
+  .donate-section::before,
+  .donate-section::after {
+    display: none;
+  }
+}

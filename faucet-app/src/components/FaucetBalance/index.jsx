@@ -5,7 +5,7 @@ import httpCommon from '../../http-common';
 import QRCode from 'qrcode';
 import toast from 'react-hot-toast';
 
-export default function DonateSection({ testnet }) {  
+export default function DonateSection({ coin }) {  
   const [ua, setUa] = useState('Loading ...');
   const [qr, setQr] = useState('');
   const [balance, setBalance] = useState('Loading ...');
@@ -37,7 +37,7 @@ export default function DonateSection({ testnet }) {
     const updateBalance = () => {
       httpCommon.get('/balance').then(res => {
         if (res.status == 200) {        
-          setBalance(`${res.data} ${testnet ? 'TAZ' : 'ZEC'}`);
+          setBalance(`${res.data} ${coin}`);
         }      
       }).catch((err) => { console.log(err) });    
     }

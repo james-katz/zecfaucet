@@ -5,15 +5,16 @@ import FaucetClaim from '../FaucetClaim';
 import { useEffect, useState } from 'react';
 import httpCommon from '../../http-common';
 
-export default function Header({testnet}) {
-  const [coinName, _] = useState(testnet ? 'TAZ' : 'ZEC');
+export default function Header({coin}) {
   const [faucetPayout, setFaucetPayout] = useState({
     u_pay: 0,
     z_pay: 0,
     t_pay: 0
   });
 
-  useEffect(() => {
+
+  useEffect(() => {    
+
     httpCommon.get('/payout').then((res) => {
       if(res.data && res.data.status == 200) {        
         setFaucetPayout(res.data.payout)
@@ -46,7 +47,7 @@ export default function Header({testnet}) {
             <strong>zecfaucet.com</strong>
           </h1>
           <p>Enter your Zcash address to</p>
-          <p>receive {faucetPayout.u_pay} {coinName}</p>
+          <p>receive {faucetPayout.u_pay} {coin}</p>
           <p className="warning">
             ZecFaucet only sends to Unified Addresses 
             <br />

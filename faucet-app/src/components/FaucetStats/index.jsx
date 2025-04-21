@@ -3,7 +3,7 @@ import { useRef, useEffect, useState } from 'react';
 import httpCommon from '../../http-common';
 import './index.css';
 
-export default function FaucetStats({ testnet }) {
+export default function FaucetStats({ coin }) {
   const ref = useRef();
   const { scrollYProgress } = useScroll({
     target: ref,
@@ -12,7 +12,6 @@ export default function FaucetStats({ testnet }) {
 
   const x = useTransform(scrollYProgress, [0, 0.5, 1], ['-100%', '0%', '0%']);
 
-  const [coinName, setCoinName] = useState(testnet ? 'TAZ' : 'ZEC');
   const [totalSent, setTotalSent] = useState('Loading ...');
   const [totalClaims, setTotalClaims] = useState('Loading ...');
 
@@ -25,7 +24,7 @@ export default function FaucetStats({ testnet }) {
     const updateStats = () => {
       httpCommon.get('/stats').then((res) => {
         if(res.status === 200) {
-          setTotalSent(`${res.data.sent.toLocaleString('en-US')} ${coinName}`);
+          setTotalSent(`${res.data.sent.toLocaleString('en-US')} ${coin}`);
           setTotalClaims(`${res.data.claims.toLocaleString('en-US')}`);
         }
       });
@@ -70,7 +69,7 @@ export default function FaucetStats({ testnet }) {
         <motion.div className="yellow-swipe" style={{ x }} />
         <div className="stats-left-content">
           <h2>Faucet<br />Statistics</h2>
-          <p>Total {coinName} sent</p>
+          <p>Total {coin} sent</p>
           <h3>{totalSent}</h3>
           <p>Total claims</p>
           <h3>{totalClaims}</h3>
@@ -84,7 +83,7 @@ export default function FaucetStats({ testnet }) {
             <thead>
               <tr>
                 <th>Date</th>
-                <th>Amount ({coinName})</th>
+                <th>Amount ({coin})</th>
                 <th>Memo</th>
               </tr>
             </thead>

@@ -25,7 +25,7 @@ const { TxBuilder } = require('./zingolib-wrapper/utils/utils');
 // const { join } = require('path');
 
 const { initializeDatabase, Transaction, Claim, Challenge } = require('./sequelize');
-const { Op, DATE } = require('sequelize');
+const { Op } = require('sequelize');
 
 const app = express();
 const port = 2653;
@@ -212,7 +212,7 @@ app.get('/api/donate', async (req, res) => {
 
 app.get('/api/balance', async (req, res) => {    
     zingo.fetchTotalBalance().then((bal) => {
-        res.send(`${bal}`);
+        res.send(`${bal.toFixed(8)}`);
     });
 });
 

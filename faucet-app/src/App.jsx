@@ -7,12 +7,13 @@ import FaucetStats from "./components/FaucetStats";
 import About from "./components/About";
 
 export default function App() {
-  const [isTestnet, setIsTestnet] = useState(true);   
   const [faucetOffline, setFaucetOffline] = useState(false);
+  const [coinName, setCoinName] = useState('');   
+
   useEffect(() => {
     httpCommon.get('/network').then((res) => {
       if(res.status === 200) {
-        setIsTestnet(res.data.net === 'test');
+        setCoinName(res.data.net === "test" ? "TAZ" : "ZEC");
       }
     }).catch((err) => {
       console.log(err);
@@ -34,9 +35,9 @@ export default function App() {
       ) : (
         <>
           {/* <div className="scroll-container"> */}
-          <PageHeader testnet={isTestnet}/>
-          <DonateSection testnet={isTestnet}/>
-          <FaucetStats testnet={isTestnet} />
+          <PageHeader coin={coinName}/>
+          <DonateSection coin={coinName}/>
+          <FaucetStats coin={coinName} />
           <About /> 
         {/* </div> */}
       </>

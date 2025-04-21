@@ -1,18 +1,55 @@
 import { useState } from 'react';
+import { toast } from 'react-hot-toast';
+import ProofOfWorkModal from '../ProofOfWorkModal';
+import httpCommon from '../../http-common';
 import './index.css';
 
 export default function FaucetClaim() {
   const [userAddress, setUserAddress] = useState('');
-
+  const [modalVisible, setModalVisible] = useState(false);
+  const [challenge, setChallenge] = useState({});
   const handleInputChange = (e) => {
     setUserAddress(e.target.value);
   };
 
   const handleSubmit = () => {
-    if (!wallet) return alert('Please enter a wallet address!');
-    console.log('Claiming faucet for wallet:', userAddress);
-    // 👉 You can call your backend/faucet API here
+    if (!userAddress) return toast.error('Please enter a Zcash Unified address!');
+    httpCommon.post('/challenge', { address: userAddress } ).then((res) => {
+      if(res.data && res.data.status == 200) {        
+        setChallenge({
+          id: res.data.message.id,
+          msg: res.data.message.message,
+          difficulty: res.data.message.difficulty,
+          level: res.data.message.level
+        });
+        setModalVisible(true);        
+      }
+      else if(res.data && res.data.message) {
+        toast.error(res.data.message);
+      }
+      else {
+        toast.error("Service unavailable.");
+      }
+    });
   };
+
+  const handleSuccess = ({ nonce, hash }) => {
+    setModalVisible(false);
+    const token = {
+      id: challenge.id,
+      nonce: nonce,
+      hash: hash
+    };    
+
+    httpCommon.post('/add', { address: userAddress, token: token } ).then((res) => {
+          if(res.data && res.data.status == 200) {
+            toast.success(res.data.message);
+          }
+          else if(res.data && res.data.message) {
+            toast.error(res.data.message);
+          }
+        });
+  }
 
   return (
     <div className="faucet-claim">
@@ -26,6 +63,12 @@ export default function FaucetClaim() {
       <button onClick={handleSubmit} className="faucet-button">
         SEND NOW
       </button>
+      <ProofOfWorkModal
+        visible={modalVisible}
+        challenge={challenge}
+        onDecline={() => setModalVisible(false)}
+        onSuccess={handleSuccess}
+      />
     </div>
   );
 }

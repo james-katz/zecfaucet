@@ -11,9 +11,9 @@ const sequelize = new Sequelize({
 const Transaction = sequelize.define('transaction', {
     txid: {
         type: DataTypes.STRING,
-        allowNull: false,
+        allowNull: true,
         primaryKey: true,
-        unique: true,
+        // unique: true,
     },
     value: {
         type: DataTypes.BIGINT,
@@ -36,12 +36,33 @@ const Transaction = sequelize.define('transaction', {
 const Claim = sequelize.define('claim', {
     address: {
         type: DataTypes.STRING
+    },
+    ip: {
+        type: DataTypes.STRING
+    },
+    pending: {
+        type: DataTypes.BOOLEAN
+    }
+});
+
+const Challenge = sequelize.define('challenge', {
+    message: {
+        type: DataTypes.STRING
+    },
+    difficulty: {
+        type: DataTypes.INTEGER
     }
 });
 
 // Setup relationships
 Transaction.hasMany(Claim);
-Claim.belongsTo(Transaction);
+Claim.belongsTo(Transaction, {
+    foreignKey: {
+        name: 'transactionTxid',
+        allowNull: true  // <== Important
+    },
+    targetKey: 'txid'
+});
 
 // reset database
 const resetDatabase = async () => {
@@ -69,4 +90,4 @@ const initializeDatabase = async () => {
     }
 };
 
-module.exports = { sequelize, initializeDatabase, resetDatabase, Transaction, Claim };
+module.exports = { sequelize, initializeDatabase, resetDatabase, Transaction, Claim, Challenge };

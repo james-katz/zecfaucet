@@ -6,6 +6,8 @@ const cors = require('cors')
 
 const axios = require('axios');
 
+const crypto = require('crypto');
+
 const https = require('https');
 const fs = require('fs');
 
@@ -22,8 +24,8 @@ const LiteWallet = require('./zingolib-wrapper/zingolib');
 const { TxBuilder } = require('./zingolib-wrapper/utils/utils');
 // const { join } = require('path');
 
-const { initializeDatabase, Transaction, Claim } = require('./sequelize');
-const { Op } = require('sequelize');
+const { initializeDatabase, Transaction, Claim, Challenge } = require('./sequelize');
+const { Op, DATE } = require('sequelize');
 
 const app = express();
 const port = 2653;
@@ -33,12 +35,11 @@ const u_payout = network == "main" ? 0.0005 : 0.3;
 const z_payout = network == "main" ? 0.0004 : 0.2;
 const t_payout = network == "main" ? 0.0003 : 0.1;
 
-const memo = `Thanks for using ${network == 'test' ? 'testnet.' : ''} ZecFaucet.com`
+const memo = `Thanks for using ${network == 'test' ? 'testnet.' : ''}ZecFaucet.com`;
 
 // Queue for the faucet payout
-let queue = [];
-const waitlist = [];
-const waittime = 120; // Time in minuts before next claim
+const waitTime = 60; // Time in minuts before next claim
+const payInterval = 3; // Time in minuts between payments
 
 app.use(bodyParser.urlencoded({ extended: true }));
 app.use(bodyParser.json()) // to convert the request into JSON
@@ -47,8 +48,15 @@ app.set("trust proxy", true);
 
 // Setup zingolib
 const zingo = new LiteWallet(lwd_url, network, false);
-let syncing = true;
 let logStream;
+
+const fakeSendTransaction = (foo) => {
+    return new Promise((resolve, reject) => {
+        setInterval(() => {
+            resolve("fakeTxId");
+        }, 2 * 1000);
+    });
+}
 
 // Initialize zingolib
 zingo.init().then(async () => {    
@@ -60,20 +68,33 @@ zingo.init().then(async () => {
 
     // Send payments every 3 minutes
     const timerID = setInterval(async() => {
+        
         const sendProgress = zingo.isSending;
-        const notes = await zingo.fetchNotes();
-        let pending = notes.pending_orchard_notes.length > 0 || notes.pending_sapling_notes.length > 0 || notes.pending_utxos.length > 0;        
-        syncing = zingo.inRefresh;
+        // const notes = await zingo.fetchNotes();
+        // let pending = notes.pending_orchard_notes.length > 0 || notes.pending_sapling_notes.length > 0 || notes.pending_utxos.length > 0;        
 
-        console.log(`Queue: ${queue.length} | Sending: ${sendProgress} | Pending: ${pending} | Syncing: ${syncing}`);
-        if(queue.length > 0 && !sendProgress && !pending && !syncing) {
-            const tmpQueue = queue.slice();  
-            const totalValue = tmpQueue.map((el) => el.amount).reduce((acc, curr) => acc + curr, 0);
+        const queue = await Claim.findAll({
+            where: {
+                pending: true
+            }
+        });
 
-            zingo.sendTransaction(tmpQueue).then(async (txid)=>{
-                console.log(txid);
-                logStream.write(`txid: ${txid}\n============\n`);
+        console.log(`Queue: ${queue.length} | Sending: ${sendProgress}`);
+        if(queue.length > 0 && !sendProgress) {
+            const sendJson = queue.flatMap((q) => {
+                const tx = new TxBuilder()
+                    .setRecipient(q.address)
+                    .setAmount(parseFloat(u_payout))
+                    .setMemo(memo);
 
+                return tx.getSendJSON();
+            });  
+
+            zingo.sendTransaction(sendJson).then(async (txid)=>{
+            // fakeSendTransaction(sendJson).then(async (txid)=>{                               
+                const totalValue = sendJson.map((el) => el.amount).reduce((acc, curr) => acc + curr, 0);
+                
+                // console.log(totalValue)
                 try {
                     // add Transaction and claims to database
                     const newTx = await Transaction.create({
@@ -84,37 +105,29 @@ zingo.init().then(async () => {
                         memo: memo
                     });
                     
-                    for(const claim of tmpQueue) {
-                        await newTx.createClaim({
-                            address: claim.address
-                        });
+                    for(const claim of queue) {
+                        claim.pending = false;
+                        claim.transactionTxid = newTx.txid;                        
+                        await claim.save();
                     }
                 }
-                catch {
+                catch(err) {
                     console.log("Couldn't add new tx to database");
+                    // console.log(err);
                 }
-
-                // remove claims from the original queue, keep newly added items
-                tmpQueue.forEach((el) => {
-                    queue.splice(queue.indexOf(el), 1);
-                });
+                
+                logStream.write(`txid: ${txid}\n============\n`);
             }).catch((err) => {
                 console.log(err);
             });
-        }
-
-        // Clear waitlist for users that waited more than `waittime`
-        const timeStamp = new Date();
-        waitlist.forEach((el) => {
-            const oldTimeStamp = el.timestamp;
-            const nextClaim = waittime - ((timeStamp - oldTimeStamp) / (1000*60));
-            if(nextClaim < 0) {
-                waitlist.splice(waitlist.indexOf(el), 1);
-            }
-        });
-        console.log(`Waitlist length: ${waitlist.length}`); 
-
-        // let's use the same timer to detect donations and add them to the database
+        }  
+    }, payInterval * 60 * 1000);    
+    
+    // Check new donations
+    const donationsTimerId = setInterval(async () => {
+        const sendProgress = zingo.isSending;
+        if(sendProgress) return;
+        
         const lastDbTxid = await Transaction.findAll({
             order: [['createdAt', 'DESC']],
             limit: 1
@@ -122,8 +135,8 @@ zingo.init().then(async () => {
 
         const lastTxid = zingo.fetchLastTxId();
 
-        if(lastTxid && lastDbTxid[0] && lastDbTxid[0].txid != lastTxid) {                   
-            const txSummaries = await zingo.getTransactionsSummaries();
+        if(lastTxid && lastDbTxid[0] && lastDbTxid[0].txid && lastDbTxid[0].txid != lastTxid) {                   
+            const txSummaries = await zingo.getTransactionsSummaries();                        
             const walletTxns = txSummaries.transaction_summaries.reverse();
             let count = 0;
             for(const tx of walletTxns) {
@@ -143,7 +156,8 @@ zingo.init().then(async () => {
                         else if(tx.sapling_notes[0] && tx.sapling_notes[0].memo != null) {
                             txMemo = tx.sapling_notes[0].memo;
                         }
-                        const newDonation = await Transaction.create({
+
+                        await Transaction.create({
                             txid: tx.txid,
                             kind: tx.kind,
                             value: tx.value,                            
@@ -153,7 +167,7 @@ zingo.init().then(async () => {
                         console.log(`New donation of ${tx.value / 10**8} received!\nMessage: ${txMemo}`);
                     }
                     catch {
-                        console.log("Couldn't insert donation into db ...");
+                        // console.log("Couldn't insert donation into db ...");
                     }
                     count += 1;
                 }
@@ -162,7 +176,7 @@ zingo.init().then(async () => {
         else {
             console.log("No new donation");           
         }
-    }, 4 * 60 * 1000);
+    }, payInterval * 1.5 * 60 * 1000);
 }).catch((err) => { console.log(err) });
 
 function getClientIp(req) {
@@ -174,36 +188,39 @@ function getClientIp(req) {
     return req.ip; // Fallback to req.ip if no x-forwarded-for header
 };
 
-app.get ('/network', (req, res) =>{
+app.get ('/api/network', (req, res) =>{
     res.json({
         net: network
     });
 });
 
-app.get ('/payout', (req, res) =>{
+app.get ('/api/payout', (req, res) =>{
     res.json({
-        u_pay: u_payout,
-        z_pay: z_payout,
-        t_pay: t_payout
+        status: 200,
+        payout: {
+            u_pay: u_payout,
+            z_pay: z_payout,
+            t_pay: t_payout
+        }
     });
 });
 
-app.get('/donate', async (req, res) => {    
+app.get('/api/donate', async (req, res) => {    
     const addr = await zingo.fetchAllAddresses();
     res.send(addr[0].address);
 });
 
-app.get('/balance', async (req, res) => {    
+app.get('/api/balance', async (req, res) => {    
     zingo.fetchTotalBalance().then((bal) => {
         res.send(`${bal}`);
     });
 });
 
-app.get('/log', async (req, res) => {
+app.get('/api/log', async (req, res) => {
     res.sendFile(path.join(__dirname, 'log.txt'));
 });
 
-app.get('/txns', async (req, res) => {
+app.get('/api/txns', async (req, res) => {
     const recentDonations = await Transaction.findAll({
         where: { 
             kind: 'received',
@@ -225,7 +242,7 @@ app.get('/txns', async (req, res) => {
     res.json(donationsJson);
 });
 
-app.get('/stats', async (req, res) => {
+app.get('/api/stats', async (req, res) => {
     const totalSent = await Transaction.sum('value', {
         where: { kind: 'sent' }
     });
@@ -239,35 +256,104 @@ app.get('/stats', async (req, res) => {
     res.json(result);
 });
 
-app.post('/add', async (req, res) => {
-    const ss = await zingo.doSyncStatus();
-    syncing = ss.in_progress; 
-
-    if(syncing) res.send('syncing');
-    else {
-        // CHeck if it is a valid address
-        const addr = req.body.address;
-        const validAddr = await zingo.parseAddress(addr);    
-        const token = req.body.token;
-        const validToken = true;
-        if(!validToken.success) {
-            res.send("invalid-token");
-            return;
+const canClaim = async (address, ip) => {
+    // Check if user awaited `waitTime` (even if user is still in the queue)
+    const cutoffTime = new Date(Date.now() - waitTime * 60 * 1000);
+  
+    const recentClaim = await Claim.findOne({
+        where: {
+            [Op.or]: [
+                { address },
+                { ip }
+            ],
+            createdAt: {
+            [Op.gte]: cutoffTime
         }
-        else if(validAddr && validAddr.chain_name == network) {
-            // First, check if user can claim faucet
-            const userIp = getClientIp(req);
-            const userFp = req.body.fingerprint;
-            const timeStamp = new Date();
-            
-            // Check if user is using proxy/vpn            
-            try {
-                const ipAddress = userIp.match(/(\d{1,3}\.\d{1,3}\.\d{1,3}\.\d{1,3})$/)[0];             
+    },
+        order: [['createdAt', 'DESC']]
+    });
+    
+    if (!recentClaim) {
+        return { allowed: true };
+    }
+  
+    const now = new Date();
+    const claimTime = new Date(recentClaim.createdAt);
+    const elapsedMs = now - claimTime;
+    const elapsedMinutes = elapsedMs / 60000;
+    const remainingMinutes = Math.ceil(waitTime - elapsedMinutes);
+  
+    return {
+        allowed: false,
+        remaining: remainingMinutes
+    };
+};
+
+const checkValidPoW = async (token) => {
+    let nonce = token.nonce;
+    
+    const hashMessage = (input) => {
+        const hash = crypto.createHash('sha256');
+        hash.update(input);
+        const hashArray = new Uint8Array(hash.digest());
+        return Array.from(new Uint8Array(hashArray)).map(b => b.toString(16).padStart(2, '0')).join('');
+    };        
+    
+    let message;
+    let minZeros = '0'.repeat(4);
+
+    try {
+        const challenge = await Challenge.findOne({
+            where: {
+                id: token.id
+            }
+        });
+        if (challenge) {
+            message = challenge.message;
+            diff = challenge.difficulty;
+
+            const trial = message + nonce;
+            const hash = hashMessage(trial);
+
+            const hashesMatch = hash == token.hash;
+            const hasMinZeros = hash.startsWith(minZeros);
+
+            if(hashesMatch && hasMinZeros) {
+                console.log(`Valid solution for proof of work for challenge id ${challenge.id}!`);
+                await challenge.destroy();
+                return true;
+            }
+        }       
+    }
+    catch(err) {
+        console.log(err);
+        return false;
+    }
+
+    return false;
+}
+
+app.post('/api/challenge', async (req, res) => {
+    // CHeck if it is a valid address
+    const userAddr = req.body.address;
+    const userIp = getClientIp(req);    
+
+    const validAddr = await zingo.parseAddress(userAddr);
+    if(validAddr && validAddr.address_kind === 'unified' && validAddr.chain_name == network) {
+        const userCanClaim = await canClaim(userAddr, userIp);
+        if (userCanClaim.allowed) {
+            // Before anything, check if user is using proxy/vpn            
+            try {        
+                const ipAddress = ip.match(/(\d{1,3}\.\d{1,3}\.\d{1,3}\.\d{1,3})$/)[0];             
                 const proxyOrVpn = await axios.get(`http://check.getipintel.net/check.php?ip=${ipAddress}&contact=james.j.katz@protonmail.com`);
                 if(proxyOrVpn.data > 0.90) {
                     console.log("VPN/Proxy detected. User blocked!");
+                    const timeStamp = new Date();
                     logStream.write(`${timeStamp.toISOString()} | Proxy or VPN blocked: ${ipAddress}\n\n`);
-                    res.send('invalid-token');
+                    res.send({
+                        status: 403,
+                        message: `Sorry, we couldn't verify you're not a robot.`
+                    });
                     return;
                 }                
             }
@@ -275,124 +361,137 @@ app.post('/add', async (req, res) => {
                 console.log("Couldn't check user ip for proxy or vpn.");
             }
 
-            // Blacklist some addresses
-            try {
-                // Get total times this address has claimed from the faucet
-                let totalClaims = await Claim.count({
-                    where: {
-                        address: addr
-                    }
+            // Then check if faucet has enough balance
+            // TODO: Move to a separete function
+            const bal = await zingo.fetchTotalBalance();
+            const queue = await Claim.findAll({
+                where: {
+                    pending: true
+                }
+            });
+            const fee = await zingo.getDefaultFee() * queue.length;
+            const queueSum = queue.map((el) => el.amount).reduce((acc, curr) => acc + curr, fee);
+            
+            if((queueSum + u_payout) * 2 >= (bal * 10**8)) {
+                res.send({
+                    status: 503,
+                    message: `It looks like the faucet wallet don't have enough funds 🥹`
                 });
-
-                // Get how many times this address claimed in the last 24 hours
-                let recentClaims = await Claim.count({
+                return;
+            }
+            
+            // If everything is ok, send the challenge to the user            
+            try {  
+                // Get faucet claims in the last hour
+                let claimsPerHour = await Claim.count({
                     where: {
-                        address: addr,
+                        pending: false,
                         createdAt: {
-                            [Op.gte]: new Date(new Date() - 24 * 60 * 60 * 1000) // 24 hours ago
+                            [Op.gte]: new Date(new Date() - 60 * 60 * 1000) // 24 hours ago
                         }
                     }
                 });
-                
-                // Reject if `totalClaims` is larger or equal than 100 (permanent blacklist)
-                // or `recentClaims`is larger than 8 (temporary blacklist)
-                if(totalClaims >= 100 || recentClaims > 8) {
-                    console.log(`Blacklist address blocked!`);
-                    console.log(`totalClaims: ${totalClaims}`);
-                    console.log(`recentClaims: ${recentClaims}`);
+                let baseDiff = Math.min(10, 5 + Math.floor(claimsPerHour / 4));
+                let effort = 'easy';
+                if(claimsPerHour > 6) effort = 'medium';
+                if(claimsPerHour > 12) effort = 'hard';
 
-                    logStream.write(`${timeStamp.toISOString()} | Blacklisted address: ${addr}\n\n`);
+                // Get the total user claims (wallet address or IP)
+                let userClaimCount = await Claim.count({
+                    where: {
+                        [Op.or]: [
+                            { address: userAddr },
+                            { ip: userIp }
+                        ]
+                    }
+                });
+                const extraZeros = Math.floor(userClaimCount / 25);
+                const finalDiff = baseDiff + extraZeros;
+                if(userClaimCount > 50) effort = 'medium';
+                if(userClaimCount > 100) effort = 'hard';                
 
-                    // Reject with `invalid-token`, so attacker don't know the exact reason the claim was rejected
-                    res.send('invalid-token');
-                    return;
-                }
+                const now = new Date().toLocaleTimeString('en-US').replace(/\s/g, '-');
+                const msg = `${userAddr}-${userIp}-${now}` ;
+                const challenge = await Challenge.create({
+                    message: msg,
+                    difficulty: finalDiff,                    
+                });
+
+                console.log(`New challenge: id: ${challenge.id}, difficulty: ${finalDiff}, effort level: ${effort}`);
+
+                res.send({
+                    status: 200,
+                    message: {
+                        id: challenge.id,
+                        message: challenge.message,
+                        difficulty: challenge.difficulty,
+                        level: effort
+                    }
+                });
             }
             catch(err) {
-                console.log("Error getting address claims.");
-            }
-              
-            const user = waitlist.filter(el => (el.ip === userIp || el.fp === userFp || el.address === addr || el.sapling === addr));
-            if(user.length > 0) {
-                const oldTimeStamp = user[0].timestamp;
-                const nextClaim = waittime - ((timeStamp - oldTimeStamp) / (1000*60));
-                if(nextClaim < 0) {
-                    waitlist.splice(waitlist.indexOf(user[0]), 1);
-                } 
-                else {
-                    res.send(`greedy ${ Math.ceil(nextClaim) }`);                
-                    return;
-                }   
-            }
-            
-            // Also block sequential IP addresses based on the first 2 octets
-            let ipOctet = userIp.slice(0,12);
-            let seqIp = waitlist.filter((el) => el.ip.startsWith(ipOctet));
-            if(seqIp.length > 0) {
-                console.log(`Sequential IP blocked: ${ipAddress}`);
-                logStream.write(`${timeStamp.toISOString()} | Sequential IP blocked: ${ipAddress}\n\n`);
-                res.send('invalid-token');
-                return;
-            }
-
-            const pay = validAddr.address_kind === 'unified' ? u_payout.toFixed(4) : validAddr.address_kind === 'sapling' ? z_payout.toFixed(4) : t_payout.toFixed(4);
-            // Reject if it's transparent address (mainnet)
-            if(pay == t_payout && network == "main") {
-                res.send("transparent");
-                return;
-            }
-            
-            // Construct transaction
-            const tx = new TxBuilder()
-                .setRecipient(addr)
-                .setAmount(parseFloat(pay))
-                .setMemo(memo);
-            
-            // Get sendJson
-            const sendJson = tx.getSendJSON();
-
-            // Check if faucet has enough bals
-            const bal = await zingo.fetchTotalBalance();
-            const fee = await zingo.getDefaultFee();
-            const queueSum = queue.map((el) => el.amount).reduce((acc, curr) => acc + curr, fee);
-            
-            if(queueSum + sendJson[0].amount >= (bal * 10**8)) {
-                res.send('faucet-dry');
+                console.log(err);
+                res.json({
+                    status: 500,
+                    message: `Internal server error.`,
+                });
                 return;
             }            
-            
-            // Add tx to the queue
-            queue.push(sendJson[0]);
-            console.log("New address added to the queue");
-            
-            // If unified address, also extract it's sapling part
-            let saplingAddr;
-            if(validAddr.address_kind === 'unified' && network == "main") {
-                let decoded = zingo.decodeAddress(addr);
-                saplingAddr = decoded.sapling;                
-            }
-            else {
-                saplingAddr = addr;
-            }
-
-            // Add user IP and browser firgerprint to the wait list
-            waitlist.push({
-                address: addr,
-                sapling: saplingAddr,
-                ip: userIp,
-                fp: userFp,
-                timestamp: timeStamp
+        }
+        else {
+            res.send({
+                status: 403,
+                message: `Please wait ${userCanClaim.remaining} minutes before claiming again.`
             });
+            return;
+        }        
+    }
+    else {
+        res.send({
+            status: 400,
+            message: "Invalid address! Please verify if you entered your Zcash address correctly and try again."
+        });
+    }
+});
 
-            // Add this claim to log file
-            logStream.write(`${timeStamp.toISOString()} | IP: ${userIp} | Fingerprint: ${userFp} | Address: ${addr}\n\n`);
+app.post('/api/add', async (req, res) => {
+    const userAddr = req.body.address;
+    const userIp = getClientIp(req);
+    const token = req.body.token;
+    const tokenIsValid = await checkValidPoW(token);
+    
+    if(tokenIsValid) {                        
+        // Add this claim to log file
+        const timeStamp = new Date();
+        logStream.write(`${timeStamp.toISOString()} | IP: ${new Date()} | Address: ${userAddr}\n\n`);
 
-            res.json({
-                success: 'success',
-                amount: pay
+        try {
+            await Claim.create({
+                address: userAddr,
+                ip: userIp,
+                pending: true,                
             });
         }
-        else res.send('invalid');        
+        catch(err) {
+            console.log(err);
+            res.json({
+                status: 500,
+                message: `Internal server error.`,
+            });
+            return;
+        }
+
+        res.json({
+            status: 200,
+            message: `Success! Your address was added to the queue, in a few minutes you will receive ${u_payout} ${network == 'test' ? 'TAZ' : 'ZEC'}.`,
+        });
+    }
+    else {
+        res.send({
+            status: 403,
+            message: `Sorry, we couldn't verify you're not a robot.`
+        });
+        return;
     }
 });
 

@@ -49,6 +49,8 @@ async function migrate_db() {
                 for(const claim of txClaims) {
                     await txDb.createClaim({
                         address: claim.address,
+                        ip: '0.0.0.0',
+                        pending: false,
                         createdAt: txTimestamp
                     });
                 }

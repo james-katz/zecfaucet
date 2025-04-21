@@ -1,0 +1,82 @@
+.pow-overlay {
+    position: fixed;
+    top: 0; left: 0;
+    width: 100vw;
+    height: 100vh;
+    background: rgba(0, 0, 0, 0.5);
+    backdrop-filter: blur(4px);
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    z-index: 9999;
+}
+  
+.pow-modal {
+    background: #fff;
+    padding: 2rem;
+    border-radius: 10px;
+    max-width: 500px;
+    width: 90%;
+    text-align: center;
+    box-shadow: 0 4px 20px rgba(0, 0, 0, 0.3);
+}
+  
+.pow-text {
+    font-size: 1rem;
+    color: #444;
+    margin-bottom: 2rem;
+}
+
+.pow-status {
+    font-size: 0.75rem;
+    background-color: #ccc;
+    margin-bottom: 2rem;
+    padding: 1.5rem;
+    overflow: hidden;
+    text-overflow: ellipsis;
+}
+  
+.pow-buttons {
+    display: flex;
+    justify-content: center;
+    gap: 1rem;
+    flex-wrap: wrap;
+}
+  
+.btn-decline {
+    background: #aaa;
+    color: #fff;
+    padding: 0.8rem 1.5rem;
+    border-radius: 5px;
+    border: none;
+    cursor: pointer;
+}
+  
+.btn-accept {
+    background: #f2b200;
+    color: #000;
+    padding: 0.8rem 1.5rem;
+    border-radius: 5px;
+    border: none;
+    cursor: pointer;
+}
+  
+.btn-cancel {
+    background: #444;
+    color: #fff;
+    padding: 0.8rem 2rem;
+    border-radius: 5px;
+    border: none;
+    cursor: pointer;
+}
+  
+.btn-send {
+    background: #00c292;
+    color: #fff;
+    padding: 1rem 2rem;
+    border-radius: 8px;
+    border: none;
+    cursor: pointer;
+    font-weight: bold;
+}
+  

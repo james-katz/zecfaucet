@@ -40,7 +40,7 @@ export default function FaucetStats({ testnet }) {
             return {
               date: new Date(tx.time).toLocaleDateString('en-US'),
               amount: tx.value,
-              memo: "Lorem ipsum dolor sit amet consectetur adipisicing elit. Illum quod hic et, eligendi ad similique, cum totam iste pariatur, nulla non voluptatibus nihil enim repudiandae perspiciatis! Laudantium quo vitae assumenda?"
+              memo: tx.memo
             }
           });
           

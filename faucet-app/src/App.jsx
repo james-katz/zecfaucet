@@ -19,7 +19,7 @@ export default function App() {
       console.log(err);
       setFaucetOffline(true);
     });
-  }, []);
+  }, [coinName]);
 
   return (
     <>

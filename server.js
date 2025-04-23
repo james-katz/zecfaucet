@@ -345,11 +345,11 @@ app.post('/api/challenge', async (req, res) => {
             // Before anything, check if user is using proxy/vpn            
             try {        
                 const ipAddress = ip.match(/(\d{1,3}\.\d{1,3}\.\d{1,3}\.\d{1,3})$/)[0];             
-                const proxyOrVpn = await axios.get(`http://check.getipintel.net/check.php?ip=${ipAddress}&contact=james.j.katz@protonmail.com`);
+                const proxyOrVpn = await axios.get(`http://check.getipintel.net/check.php?ip=${userIp}&contact=james.j.katz@protonmail.com`);
                 if(proxyOrVpn.data > 0.90) {
                     console.log("VPN/Proxy detected. User blocked!");
                     const timeStamp = new Date();
-                    logStream.write(`${timeStamp.toISOString()} | Proxy or VPN blocked: ${ipAddress}\n\n`);
+                    logStream.write(`${timeStamp.toISOString()} | Proxy or VPN blocked: ${userIp}\n\n`);
                     res.send({
                         status: 403,
                         message: `Sorry, we couldn't verify you're not a robot.`

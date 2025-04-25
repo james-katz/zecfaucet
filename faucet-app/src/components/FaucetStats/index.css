@@ -45,7 +45,7 @@
     left: 0;
     height: 100%;
     width: 100%;
-    background: #f2b200;
+    background: #ffbd02;
     z-index: 1;
     will-change: transform;
 }
@@ -55,7 +55,7 @@
     position: relative;
     z-index: 2;
     padding: 2rem;
-    color: rgb(74, 74, 74);
+    color: #575757;
     display: flex;
     flex-direction: column;    
     margin-left: 3rem;
@@ -112,8 +112,8 @@
 }
 
 .donations-table th {
-  background-color: #f2b200;
-  color: #fff;
+  background-color: #ffbd02;
+  color: #575757;
   padding: 0.75rem;
 }
 

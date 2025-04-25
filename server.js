@@ -344,8 +344,8 @@ app.post('/api/challenge', async (req, res) => {
         if (userCanClaim.allowed) {
             // Before anything, check if user is using proxy/vpn            
             try {        
-                const ipAddress = ip.match(/(\d{1,3}\.\d{1,3}\.\d{1,3}\.\d{1,3})$/)[0];             
-                const proxyOrVpn = await axios.get(`http://check.getipintel.net/check.php?ip=${userIp}&contact=james.j.katz@protonmail.com`);
+                const ipAddress = userIp.match(/(\d{1,3}\.\d{1,3}\.\d{1,3}\.\d{1,3})$/)[0];             
+                const proxyOrVpn = await axios.get(`http://check.getipintel.net/check.php?ip=${ipAddress}&contact=james.j.katz@protonmail.com`);
                 if(proxyOrVpn.data > 0.90) {
                     console.log("VPN/Proxy detected. User blocked!");
                     const timeStamp = new Date();
@@ -387,7 +387,7 @@ app.post('/api/challenge', async (req, res) => {
                     where: {
                         pending: false,
                         createdAt: {
-                            [Op.gte]: new Date(new Date() - 60 * 60 * 1000) // 24 hours ago
+                            [Op.gte]: new Date(new Date() - 60 * 60 * 1000)
                         }
                     }
                 });

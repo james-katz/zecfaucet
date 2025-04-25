@@ -1,35 +1,40 @@
 .about-section {
     position: relative;
     display: flex;
+    flex-direction: column;
     height: 100vh;
     overflow: hidden;
+    background-color: #efefef;
+    text-align: center;
+
 }
 
 .about-faucet {
     display: flex;
-    flex-direction: column;    
+    flex-direction: column;   
     height: 100%;
-    text-align: center;
-    justify-content: space-between; /* 👈 this does the magic! */
-    /* width: 100%; */
-    padding: 0 6rem;
-    background-color: #efefef;
+    /* justify-content: space-between; */
+    /* width: 70%; */
+    padding: 0 8rem;
 }
 
 .about-faucet h2 {
     font-size: 4rem;    
-    color: #6d6d6d;
+    color: #575757;
 }
 
 .about-faucet p {
     font-size: 1.6rem;
-    color: #6d6d6d;
-    flex: 1;
+    color: #575757;
+    /* flex: 1;     */
+    margin: 1rem;
 }
 
-.about-faucet h3 {
+.about-faucet-footer h3 {
     font-size: 1.8rem;
-    color: #6d6d6d;
+    color: #575757;
+    flex: 1;
+    
 }
 
 @media (max-width: 768px) {

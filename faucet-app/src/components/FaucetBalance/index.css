@@ -33,7 +33,7 @@
 .donate-right {  
     flex: 1;
     position: relative;
-    background-color: #f2b200; /* mustard yellow */
+    background-color: #ffbd02; /* mustard yellow */
     align-items: center;
     justify-content: center;
     overflow: hidden;
@@ -55,7 +55,7 @@
     position: relative;
     z-index: 2;
     padding: 2rem;
-    color: black;
+    color: #575757;
     display: flex;
     flex-direction: column;    
     margin-left: 3rem;
@@ -92,7 +92,7 @@
 .donate-right-content {
   z-index: 2;
   padding: 2rem 3rem;
-  color: black;
+  color: #575757;
   display: flex;
   flex-direction: column;
   align-items: center;
@@ -110,13 +110,13 @@
   font-size: 1.5rem;
   padding: 32px;
   border-radius: 16px;
-  background-color: rgba(255, 255, 255, 0.2);
+  background-color: rgba(239, 239, 239, 0.25);
 }
 
 .copy-button {
   margin-top: 2rem;
-  background-color: #333;
-  color: white;
+  background-color: #575757;
+  color: #efefef;
   font-weight: bold;
   padding: 0.8rem 2rem;
   border-radius: 2rem;

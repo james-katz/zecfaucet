@@ -22,6 +22,6 @@ body, html {
 
 .snap-section {
     scroll-snap-align: start;   
-    height: 100vh;
+    height: auto;
     min-height: 100vh;
 }

@@ -1,6 +1,6 @@
 .header-wrapper {
     position: relative;
-    /* height: 100vh; */
+    height: 100vh;
     /* overflow: hidden; */
     max-width: 1280PX; /* or 960px if you want tighter layout */
     margin: 0 auto;
@@ -102,10 +102,13 @@
   
 /* Hide logo on mobile */
 @media (max-width: 768px) {
+    .header-wrapper {
+        height: 100%;
+    }
     .header {
         padding: 0 1rem;
         flex-wrap: wrap; /* allow wrapping on small screens */
-        /* background-image: url('../../images/zecfaucet_2.0.gif'); */
+        /* background-image: url('../../images/zecfaucet_2.0.gif'); */        
     }
       
     .header-logo {
@@ -113,9 +116,10 @@
     }
 
     .header-logo-mobile {    
-        display: flex;     
-        min-width: 100%;                
-        padding-top: 1.2rem;
+        display: block;        
+        padding-top: 1.2rem;       
+        margin-left: auto;
+        margin-right: auto;
     }
 
     .header-logo-mobile img {

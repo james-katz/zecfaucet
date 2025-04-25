@@ -3,10 +3,9 @@
     display: flex;
     flex-direction: column;
     height: 100vh;
-    overflow: hidden;
+    overflow-x: hidden;
     background-color: #efefef;
     text-align: center;
-
 }
 
 .about-faucet {
@@ -16,6 +15,7 @@
     /* justify-content: space-between; */
     /* width: 70%; */
     padding: 0 8rem;
+    flex:1;
 }
 
 .about-faucet h2 {
@@ -24,32 +24,39 @@
 }
 
 .about-faucet p {
-    font-size: 1.6rem;
-    color: #575757;
-    /* flex: 1;     */
-    margin: 1rem;
+    font-size: 1.4rem;
+    color: #575757;        
 }
 
 .about-faucet-footer h3 {
-    font-size: 1.8rem;
-    color: #575757;
-    flex: 1;
-    
+    font-size: 1.6rem;
+    color: #575757;    
 }
 
 @media (max-width: 768px) {
     .about-section {
       flex-direction: column;
-      height: auto;              /* 👈 allow content to grow */
-      min-height: 100vh;         /* 👈 optional: still fill screen */      
+      height: auto;
+      min-height: 100vh;      
     }
 
     .about-faucet {
-        padding: 0 1rem;        
+        padding: 0 1rem;          
+    }
+
+    .about-faucet p{
+        font-size: 1.2rem;
     }
 
     .about-faucet h2 {
-        font-size: 3.2rem;
+        font-size: 3rem;
     }
-  
+
+    .about-faucet-footer {
+        flex: 1;
+        padding: 0.5rem;
+    }
+    .about-faucet-footer h3{
+        font-size: 1rem;
+    }
   }

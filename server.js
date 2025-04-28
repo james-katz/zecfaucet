@@ -19,6 +19,7 @@ const lwd_url = process.env.LWD_URL;
 const network = process.env.NETWORK;
 
 const useHttps = process.env.USE_HTTPS === "true";
+const blockVpn = process.env.BLOCK_VPN === "true";
 
 const LiteWallet = require('./zingolib-wrapper/zingolib');
 const { TxBuilder } = require('./zingolib-wrapper/utils/utils');
@@ -346,7 +347,7 @@ app.post('/api/challenge', async (req, res) => {
             try {        
                 const ipAddress = userIp.match(/(\d{1,3}\.\d{1,3}\.\d{1,3}\.\d{1,3})$/)[0];             
                 const proxyOrVpn = await axios.get(`http://check.getipintel.net/check.php?ip=${ipAddress}&contact=james.j.katz@protonmail.com`);
-                if(proxyOrVpn.data > 0.90) {
+                if(proxyOrVpn.data > 0.90 && blockVpn) {
                     console.log("VPN/Proxy detected. User blocked!");
                     const timeStamp = new Date();
                     logStream.write(`${timeStamp.toISOString()} | Proxy or VPN blocked: ${userIp}\n\n`);
@@ -391,10 +392,10 @@ app.post('/api/challenge', async (req, res) => {
                         }
                     }
                 });
-                let baseDiff = Math.min(10, 5 + Math.floor(claimsPerHour / 4));
+                let baseDiff = Math.min(10, 5 + Math.floor(claimsPerHour / 3));
                 let effort = 'easy';
-                if(claimsPerHour > 6) effort = 'medium';
-                if(claimsPerHour > 12) effort = 'hard';
+                if(claimsPerHour > 4) effort = 'medium';
+                if(claimsPerHour > 8) effort = 'hard';
 
                 // Get the total user claims (wallet address or IP)
                 let userClaimCount = await Claim.count({
@@ -405,10 +406,10 @@ app.post('/api/challenge', async (req, res) => {
                         ]
                     }
                 });
-                const extraZeros = Math.floor(userClaimCount / 25);
+                const extraZeros = Math.floor(userClaimCount / 10);
                 const finalDiff = baseDiff + extraZeros;
-                if(userClaimCount > 50) effort = 'medium';
-                if(userClaimCount > 100) effort = 'hard';                
+                if(userClaimCount > 30) effort = 'medium';
+                if(userClaimCount > 50) effort = 'hard';                
 
                 const now = new Date().toLocaleTimeString('en-US').replace(/\s/g, '-');
                 const msg = `${userAddr}-${userIp}-${now}` ;

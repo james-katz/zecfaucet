@@ -392,10 +392,11 @@ app.post('/api/challenge', async (req, res) => {
                         }
                     }
                 });
+                console.log(`Faucet claims/hour: ${claimsPerHour}`)
                 let baseDiff = Math.min(10, 5 + Math.floor(claimsPerHour / 3));
                 let effort = 'easy';
-                if(claimsPerHour > 4) effort = 'medium';
-                if(claimsPerHour > 8) effort = 'hard';
+                if(claimsPerHour > 6) effort = 'medium';
+                if(claimsPerHour > 10) effort = 'hard';
 
                 // Get the total user claims (wallet address or IP)
                 let userClaimCount = await Claim.count({

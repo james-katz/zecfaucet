@@ -1,0 +1,90 @@
+.dashboard-section {
+    padding: 2rem;
+    background-color: #f0f0f0; /* Cor de fundo suave */
+    border-radius: 8px;
+    margin: 2rem auto;
+    max-width: 1000px; /* Limitar largura */
+    box-shadow: 0 4px 8px rgba(0, 0, 0, 0.1);
+  }
+  
+  .dashboard-section h2 {
+    text-align: center;
+    color: #333;
+    margin-bottom: 1.5rem;
+    font-size: 1.8rem;
+  }
+  
+  .metrics-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(180px, 1fr)); /* Grid responsivo */
+    gap: 1.5rem; /* Espaçamento entre os cartões */
+  }
+  
+  .metric-card {
+    background-color: #ffffff;
+    padding: 1.5rem;
+    border-radius: 6px;
+    box-shadow: 0 2px 4px rgba(0, 0, 0, 0.05);
+    text-align: center;
+    transition: transform 0.2s ease-in-out;
+  }
+  
+  .metric-card:hover {
+    transform: translateY(-5px); /* Efeito de hover */
+  }
+  
+  .metric-card h4 {
+    margin: 0 0 0.5rem 0;
+    color: #555;
+    font-size: 1rem;
+    font-weight: 600;
+  }
+  
+  .metric-card p {
+    margin: 0;
+    color: #222; /* Cor principal do Zcash (aproximada) */
+    font-size: 1.5rem;
+    font-weight: bold;
+  }
+  
+  /* Ajustes para telas menores */
+  @media (max-width: 600px) {
+    .dashboard-section {
+      padding: 1rem;
+      margin: 1rem;
+    }
+  
+    .metrics-grid {
+      grid-template-columns: 1fr; /* Uma coluna em telas pequenas */
+      gap: 1rem;
+    }
+  
+    .metric-card {
+      padding: 1rem;
+    }
+  
+    .metric-card p {
+      font-size: 1.3rem;
+    }
+  }
+  
+  
+  
+  
+  .chart-container {
+    margin-top: 2rem;
+    background-color: #ffffff;
+    padding: 1.5rem;
+    border-radius: 6px;
+    box-shadow: 0 2px 4px rgba(0, 0, 0, 0.05);
+  }
+  
+  .chart-container h4 {
+    text-align: center;
+    margin: 0 0 1rem 0;
+    color: #555;
+    font-size: 1.2rem;
+    font-weight: 600;
+  }
+  
+  

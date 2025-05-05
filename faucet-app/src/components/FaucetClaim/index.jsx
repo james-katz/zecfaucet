@@ -40,6 +40,7 @@ export default function FaucetClaim() {
       nonce: nonce,
       hash: hash
     };    
+    console.log(token);
 
     httpCommon.post('/add', { address: userAddress, token: token } ).then((res) => {
           if(res.data && res.data.status == 200) {

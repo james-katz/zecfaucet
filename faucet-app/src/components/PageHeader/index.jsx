@@ -7,11 +7,10 @@ import httpCommon from '../../http-common';
 
 export default function Header({coin}) {
   const [faucetPayout, setFaucetPayout] = useState({
-    u_pay: 0,
+    u_pay: '(Loading ...)',
     z_pay: 0,
     t_pay: 0
   });
-
 
   useEffect(() => {    
 

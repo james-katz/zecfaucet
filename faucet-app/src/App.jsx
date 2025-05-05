@@ -1,14 +1,12 @@
 import { useState, useEffect } from 'react';
+import { Outlet } from 'react-router-dom'; // Importar Outlet
 import httpCommon from './http-common';
 import { Toaster } from 'react-hot-toast';
 import PageHeader from "./components/PageHeader";
-import DonateSection from "./components/FaucetBalance";
-import FaucetStats from "./components/FaucetStats";
-import About from "./components/About";
 
 export default function App() {
   const [faucetOffline, setFaucetOffline] = useState(false);
-  const [coinName, setCoinName] = useState('');   
+  const [coinName, setCoinName] = useState('');
 
   useEffect(() => {
     httpCommon.get('/network').then((res) => {
@@ -19,7 +17,7 @@ export default function App() {
       console.log(err);
       setFaucetOffline(true);
     });
-  }, [coinName]);
+  }, []);
 
   return (
     <>
@@ -34,18 +32,17 @@ export default function App() {
         </div>
       ) : (
         <>
-          {/* <div className="scroll-container"> */}
-          <PageHeader coin={coinName}/>
-          <DonateSection coin={coinName}/>
-          <FaucetStats coin={coinName} />
-          <About /> 
-        {/* </div> */}
-      </>
+          {/* O Outlet renderizará o componente da rota filha (HomePage ou Dashboard) */}
+          <main>
+            <Outlet context={{ coinName }} /> {/* Passando coinName via context do Outlet */}
+          </main>
+        </>
       )}
     </>
   );
 }
 
+// Estilos permanecem os mesmos
 const styles = {
   container: {
     height: '100vh',

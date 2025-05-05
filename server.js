@@ -26,7 +26,7 @@ const { TxBuilder } = require('./zingolib-wrapper/utils/utils');
 // const { join } = require('path');
 
 const { initializeDatabase, Transaction, Claim, Challenge } = require('./sequelize');
-const { Op } = require('sequelize');
+const { Op, fn, col } = require('sequelize');
 
 const app = express();
 const port = 2653;
@@ -221,6 +221,60 @@ app.get('/api/log', async (req, res) => {
     res.sendFile(path.join(__dirname, 'log.txt'));
 });
 
+app.get('/api/dashboard-stats', async (req, res) => {
+    let claimsPerHour = await Claim.count({
+        where: {
+            pending: false,
+            createdAt: {
+                [Op.gte]: new Date(new Date() - 60 * 60 * 1000)
+            }
+        }
+    });
+
+    const totalSent = await Transaction.sum('value', {
+        where: { kind: 'sent' }
+    });
+    const totalClaims = await Claim.count();
+    const totalReceived = await Transaction.sum('value', {
+        where: { kind: 'received' }
+    });
+
+    const balance = await zingo.fetchTotalBalance();
+
+    const sevenDaysAgo = new Date(Date.now() - 7 * 24 * 60 * 60 * 1000);
+
+    const rawResults = await Transaction.findAll({
+        attributes: [
+            [fn('DATE', col('createdAt')), 'date'],
+            [fn('COUNT', '*'), 'total']
+        ],
+        where: {
+            kind: 'sent',
+            createdAt: {
+                [Op.gte]: sevenDaysAgo
+            }
+        },
+        group: [fn('DATE', col('createdAt'))],
+        order: [[fn('DATE', col('createdAt')), 'ASC']],
+        raw: true
+    });
+
+    // Map to clean array with formatted date
+    const latestClaims = rawResults.map(row => ({
+        name: new Date(row.date).toLocaleDateString('en-US'),
+        claims: parseInt(row.total, 10)
+    }));
+
+    res.json({
+        claimsPerHour: claimsPerHour,
+        totalClaims: totalClaims,
+        totalSent: totalSent / 10**8,
+        totalReceived: totalReceived / 10**8,
+        faucetBalance: balance,
+        latestClaims: latestClaims
+    })
+});
+
 app.get('/api/txns', async (req, res) => {
     const recentDonations = await Transaction.findAll({
         where: { 
@@ -338,6 +392,7 @@ app.post('/api/challenge', async (req, res) => {
     // CHeck if it is a valid address
     const userAddr = req.body.address;
     const userIp = getClientIp(req);    
+    let isVpn = false;
 
     const validAddr = await zingo.parseAddress(userAddr);
     if(validAddr && validAddr.address_kind === 'unified' && validAddr.chain_name == network) {
@@ -347,7 +402,6 @@ app.post('/api/challenge', async (req, res) => {
             try {        
                 const ipAddress = userIp.match(/(\d{1,3}\.\d{1,3}\.\d{1,3}\.\d{1,3})$/)[0];             
                 const proxyOrVpn = await axios.get(`http://check.getipintel.net/check.php?ip=${ipAddress}&contact=james.j.katz@protonmail.com`);
-                let isVpn = false;
                 if(proxyOrVpn.data > 0.90 && blockVpn) {
                     console.log("VPN/Proxy detected. Using a harder challenge!");
                     isVpn = true;
@@ -399,8 +453,8 @@ app.post('/api/challenge', async (req, res) => {
                 let baseDiff = Math.min(50, base + Math.floor(claimsPerHour / 3));
 
                 let effort = 'easy';
-                if(claimsPerHour > 5) effort = 'medium';
-                if(claimsPerHour > 8) effort = 'hard';
+                if(baseDiff > 7) effort = 'medium';
+                if(baseDiff >= 10) effort = 'hard';
 
                 // Get the total user claims (wallet address or IP)
                 let userClaimCount = await Claim.count({

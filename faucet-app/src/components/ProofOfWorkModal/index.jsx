@@ -35,7 +35,7 @@ export default function ProofOfWorkModal({ visible, onDecline, onSuccess, challe
         bestEffort.current = { nonce: 0, hash: 'f'.repeat(64) };
         startTime.current = Date.now();
 
-        const maxTime = level === 'easy' ? 5000 : level === 'medium' ? 15000 : 30000;
+        const maxTime = level === 'easy' ? 8000 : level === 'medium' ? 35000 : 55000;
         
         console.log(`Working on message ${message}`);
         console.log(`With difficulty ${difficulty} and level ${level}`);

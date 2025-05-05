@@ -347,15 +347,17 @@ app.post('/api/challenge', async (req, res) => {
             try {        
                 const ipAddress = userIp.match(/(\d{1,3}\.\d{1,3}\.\d{1,3}\.\d{1,3})$/)[0];             
                 const proxyOrVpn = await axios.get(`http://check.getipintel.net/check.php?ip=${ipAddress}&contact=james.j.katz@protonmail.com`);
+                let isVpn = false;
                 if(proxyOrVpn.data > 0.90 && blockVpn) {
-                    console.log("VPN/Proxy detected. User blocked!");
-                    const timeStamp = new Date();
-                    logStream.write(`${timeStamp.toISOString()} | Proxy or VPN blocked: ${userIp}\n\n`);
-                    res.send({
-                        status: 403,
-                        message: `Sorry, we couldn't verify you're not a robot.`
-                    });
-                    return;
+                    console.log("VPN/Proxy detected. Using a harder challenge!");
+                    isVpn = true;
+                    // const timeStamp = new Date();
+                    // logStream.write(`${timeStamp.toISOString()} | Proxy or VPN blocked: ${userIp}\n\n`);
+                    // res.send({
+                    //     status: 403,
+                    //     message: `Sorry, we couldn't verify you're not a robot.`
+                    // });
+                    // return;
                 }                
             }
             catch(err) {
@@ -392,11 +394,13 @@ app.post('/api/challenge', async (req, res) => {
                         }
                     }
                 });
-                console.log(`Faucet claims/hour: ${claimsPerHour}`)
-                let baseDiff = Math.min(10, 5 + Math.floor(claimsPerHour / 3));
+                console.log(`Faucet claims/hour: ${claimsPerHour}`);
+                const base = isVpn ? 10 : 5;
+                let baseDiff = Math.min(50, base + Math.floor(claimsPerHour / 3));
+
                 let effort = 'easy';
-                if(claimsPerHour > 6) effort = 'medium';
-                if(claimsPerHour > 10) effort = 'hard';
+                if(claimsPerHour > 5) effort = 'medium';
+                if(claimsPerHour > 8) effort = 'hard';
 
                 // Get the total user claims (wallet address or IP)
                 let userClaimCount = await Claim.count({
@@ -407,7 +411,7 @@ app.post('/api/challenge', async (req, res) => {
                         ]
                     }
                 });
-                const extraZeros = Math.floor(userClaimCount / 10);
+                const extraZeros = Math.floor(userClaimCount / 8);
                 const finalDiff = baseDiff + extraZeros;
                 if(userClaimCount > 30) effort = 'medium';
                 if(userClaimCount > 50) effort = 'hard';                

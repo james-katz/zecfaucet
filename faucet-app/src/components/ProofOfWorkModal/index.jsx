@@ -35,10 +35,12 @@ export default function ProofOfWorkModal({ visible, onDecline, onSuccess, challe
         bestEffort.current = { nonce: 0, hash: 'f'.repeat(64) };
         startTime.current = Date.now();
 
-        const maxTime = level === 'easy' ? 8000 : level === 'medium' ? 35000 : 55000;
-        
-        console.log(`Working on message ${message}`);
-        console.log(`With difficulty ${difficulty} and level ${level}`);
+        // const maxTime = level === 'easy' ? 8000 : level === 'medium' ? 35000 : 55000;
+        const minTime = 5000 + Math.random() * 2500;
+        const maxTime = Math.min(75*1000, Math.floor(minTime * Math.pow(1.44, difficulty - 5)));
+
+        // console.log(`Working on message ${message}`);
+        // console.log(`With difficulty ${difficulty} and level ${level}`);
 
         for (let i = 0; i < workerCount; i++) {
             const worker = new Worker(new URL('./pow.worker.js', import.meta.url), { type: 'module' });

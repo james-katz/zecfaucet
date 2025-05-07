@@ -402,16 +402,18 @@ app.post('/api/challenge', async (req, res) => {
             try {        
                 const ipAddress = userIp.match(/(\d{1,3}\.\d{1,3}\.\d{1,3}\.\d{1,3})$/)[0];             
                 const proxyOrVpn = await axios.get(`http://check.getipintel.net/check.php?ip=${ipAddress}&contact=james.j.katz@protonmail.com`);
-                if(proxyOrVpn.data > 0.90 && blockVpn) {
+                if(proxyOrVpn.data > 0.90) {
                     console.log("VPN/Proxy detected. Using a harder challenge!");
                     isVpn = true;
-                    // const timeStamp = new Date();
-                    // logStream.write(`${timeStamp.toISOString()} | Proxy or VPN blocked: ${userIp}\n\n`);
-                    // res.send({
-                    //     status: 403,
-                    //     message: `Sorry, we couldn't verify you're not a robot.`
-                    // });
-                    // return;
+                    if(blockVpn) {
+                        const timeStamp = new Date();
+                        logStream.write(`${timeStamp.toISOString()} | Proxy or VPN blocked: ${userIp}\n\n`);
+                        res.send({
+                            status: 403,
+                            message: `Sorry, we couldn't verify you're not a robot.`
+                        });
+                        return;
+                    }                    
                 }                
             }
             catch(err) {
@@ -442,15 +444,15 @@ app.post('/api/challenge', async (req, res) => {
                 // Get faucet claims in the last hour
                 let claimsPerHour = await Claim.count({
                     where: {
-                        pending: false,
+                        // pending: false,
                         createdAt: {
                             [Op.gte]: new Date(new Date() - 60 * 60 * 1000)
                         }
                     }
                 });
                 console.log(`Faucet claims/hour: ${claimsPerHour}`);
-                const base = isVpn ? 10 : 5;
-                let baseDiff = Math.min(50, base + Math.floor(claimsPerHour / 3));
+                const base = isVpn ? 20 : 5;
+                let baseDiff = Math.min(20, base + Math.floor(claimsPerHour / 3));
 
                 let effort = 'easy';
                 if(baseDiff > 7) effort = 'medium';

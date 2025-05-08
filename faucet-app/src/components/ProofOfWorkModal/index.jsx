@@ -6,7 +6,7 @@ export default function ProofOfWorkModal({ visible, onDecline, onSuccess, challe
     const [completed, setCompleted] = useState(false);    
     const [message, setMessage] = useState('');    
     const [difficulty, setDifficulty] = useState(0);
-    const [level, setLevel] = useState('easy');
+    const [isVpn, setIsVpn] = useState(false);
     const [nonce, setNonce] = useState(0);
     const [hash, setHash] = useState(0);
     const [progress, setProgress] = useState('Initializing ...');
@@ -35,9 +35,9 @@ export default function ProofOfWorkModal({ visible, onDecline, onSuccess, challe
         bestEffort.current = { nonce: 0, hash: 'f'.repeat(64) };
         startTime.current = Date.now();
 
-        // const maxTime = level === 'easy' ? 8000 : level === 'medium' ? 35000 : 55000;
+        const timeCap = isVpn ? 2*75*1000 : 75*1000;
         const minTime = 5000 + Math.random() * 2500;
-        const maxTime = Math.min(75*1000, Math.floor(minTime * Math.pow(1.44, difficulty - 5)));
+        const maxTime = Math.min(timeCap, Math.floor(minTime * Math.pow(1.44, difficulty - 5)));
 
         // console.log(`Working on message ${message}`);
         // console.log(`With difficulty ${difficulty} and level ${level}`);
@@ -115,7 +115,7 @@ export default function ProofOfWorkModal({ visible, onDecline, onSuccess, challe
     useEffect(() => {
         setMessage(challenge.msg);
         setDifficulty(challenge.difficulty);
-        setLevel(challenge.level);
+        setIsVpn(challenge.vpn);
         
         document.body.style.overflow = visible ? 'hidden' : 'auto';
         return () => {

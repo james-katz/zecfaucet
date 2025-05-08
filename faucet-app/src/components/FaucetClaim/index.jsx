@@ -20,7 +20,7 @@ export default function FaucetClaim() {
           id: res.data.message.id,
           msg: res.data.message.message,
           difficulty: res.data.message.difficulty,
-          level: res.data.message.level
+          vpn: res.data.message.vpn
         });
         setModalVisible(true);        
       }
@@ -40,7 +40,7 @@ export default function FaucetClaim() {
       nonce: nonce,
       hash: hash
     };    
-    console.log(token);
+    // console.log(token);
 
     httpCommon.post('/add', { address: userAddress, token: token } ).then((res) => {
           if(res.data && res.data.status == 200) {

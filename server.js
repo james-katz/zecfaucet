@@ -463,10 +463,6 @@ app.post('/api/challenge', async (req, res) => {
                 const base = isVpn ? 20 : 5;
                 let baseDiff = Math.min(20, base + Math.floor(claimsPerHour / 3));
 
-                let effort = 'easy';
-                if(baseDiff > 7) effort = 'medium';
-                if(baseDiff >= 10) effort = 'hard';
-
                 // Get the total user claims (wallet address or IP)
                 let userClaimCount = await Claim.count({
                     where: {
@@ -478,9 +474,7 @@ app.post('/api/challenge', async (req, res) => {
                 });
                 const extraZeros = Math.floor(userClaimCount / 8);
                 const finalDiff = baseDiff + extraZeros;
-                if(userClaimCount > 30) effort = 'medium';
-                if(userClaimCount > 50) effort = 'hard';                
-
+                               
                 const now = new Date().toLocaleTimeString('en-US').replace(/\s/g, '-');
                 const msg = `${userAddr}-${userIp}-${now}` ;
                 const challenge = await Challenge.create({
@@ -496,7 +490,7 @@ app.post('/api/challenge', async (req, res) => {
                         id: challenge.id,
                         message: challenge.message,
                         difficulty: challenge.difficulty,
-                        level: effort // Deprecated, to be removed
+                        vpn: isVpn
                     }
                 });
             }

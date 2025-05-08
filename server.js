@@ -120,6 +120,7 @@ zingo.init().then(async () => {
                 logStream.write(`txid: ${txid}\n============\n`);
             }).catch((err) => {
                 console.log(err);
+                process.kill(process.pid, "SIGINT");
             });
         }  
     }, payInterval * 60 * 1000);    
@@ -344,8 +345,8 @@ const canClaim = async (address, ip) => {
     };
 };
 
-const checkValidPoW = async (token) => {
-    let nonce = token.nonce;
+const checkValidPoW = async (token, userIp) => {
+    const nonce = token.nonce;
     
     const hashMessage = (input) => {
         const hash = crypto.createHash('sha256');
@@ -366,6 +367,14 @@ const checkValidPoW = async (token) => {
         if (challenge) {
             message = challenge.message;
             diff = challenge.difficulty;
+
+            const userIpChallenge = message.split('-')[1];
+    
+            if(userIpChallenge != userIp) {
+                console.log("IP mismatch. Claim was blocked!");
+                await challenge.destroy();
+                return false;
+            }
 
             const trial = message + nonce;
             const hash = hashMessage(trial);
@@ -479,7 +488,7 @@ app.post('/api/challenge', async (req, res) => {
                     difficulty: finalDiff,                    
                 });
 
-                console.log(`New challenge: id: ${challenge.id}, difficulty: ${finalDiff}, effort level: ${effort}`);
+                console.log(`New challenge: id: ${challenge.id}, difficulty: ${finalDiff}`);
 
                 res.send({
                     status: 200,
@@ -487,7 +496,7 @@ app.post('/api/challenge', async (req, res) => {
                         id: challenge.id,
                         message: challenge.message,
                         difficulty: challenge.difficulty,
-                        level: effort
+                        level: effort // Deprecated, to be removed
                     }
                 });
             }
@@ -520,7 +529,7 @@ app.post('/api/add', async (req, res) => {
     const userAddr = req.body.address;
     const userIp = getClientIp(req);
     const token = req.body.token;
-    const tokenIsValid = await checkValidPoW(token);
+    const tokenIsValid = await checkValidPoW(token, userIp);
     
     if(tokenIsValid) {                        
         // Add this claim to log file

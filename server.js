@@ -71,8 +71,8 @@ zingo.init().then(async () => {
     const timerID = setInterval(async() => {
         
         const sendProgress = zingo.isSending;
-        // const notes = await zingo.fetchNotes();
-        // let pending = notes.pending_orchard_notes.length > 0 || notes.pending_sapling_notes.length > 0 || notes.pending_utxos.length > 0;        
+        const notes = await zingo.fetchNotes();
+        let pending = notes.pending_orchard_notes.length > 0 || notes.pending_sapling_notes.length > 0 || notes.pending_utxos.length > 0;        
 
         const queue = await Claim.findAll({
             where: {
@@ -80,8 +80,8 @@ zingo.init().then(async () => {
             }
         });
 
-        console.log(`Queue: ${queue.length} | Sending: ${sendProgress}`);
-        if(queue.length > 0 && !sendProgress) {
+        console.log(`Queue: ${queue.length} | Sending: ${sendProgress} | Pending: ${pending}`);
+        if(queue.length > 0 && !sendProgress && !pending) {
             const sendJson = queue.flatMap((q) => {
                 const tx = new TxBuilder()
                     .setRecipient(q.address)

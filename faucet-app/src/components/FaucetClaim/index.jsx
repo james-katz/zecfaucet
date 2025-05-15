@@ -1,20 +1,33 @@
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import { toast } from 'react-hot-toast';
 import ProofOfWorkModal from '../ProofOfWorkModal';
 import httpCommon from '../../http-common';
+import { useLocation } from 'react-router-dom';
 import './index.css';
 
-export default function FaucetClaim() {
+export default function FaucetClaim( { applyVoucher } ) {
   const [userAddress, setUserAddress] = useState('');
   const [modalVisible, setModalVisible] = useState(false);
   const [challenge, setChallenge] = useState({});
+  
+  const [voucher, setVoucher] = useState('');
+
+  const { pathname } = useLocation();
+  
+  useEffect(() => {
+    if(pathname === '/privacymap') {
+      setVoucher('zcash2025');
+      applyVoucher('zcash2025');
+    }
+  },[]);
+
   const handleInputChange = (e) => {
     setUserAddress(e.target.value);
   };
 
   const handleSubmit = () => {
     if (!userAddress) return toast.error('Please enter a Zcash Unified address!');
-    httpCommon.post('/challenge', { address: userAddress } ).then((res) => {
+    httpCommon.post('/challenge', { address: userAddress, voucher: voucher } ).then((res) => {
       if(res.data && res.data.status == 200) {        
         setChallenge({
           id: res.data.message.id,
@@ -38,7 +51,8 @@ export default function FaucetClaim() {
     const token = {
       id: challenge.id,
       nonce: nonce,
-      hash: hash
+      hash: hash,
+      voucher: voucher
     };    
     // console.log(token);
 
@@ -63,7 +77,7 @@ export default function FaucetClaim() {
       />
       <button onClick={handleSubmit} className="faucet-button">
         SEND NOW
-      </button>
+      </button>      
       <ProofOfWorkModal
         visible={modalVisible}
         challenge={challenge}

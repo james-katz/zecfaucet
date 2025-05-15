@@ -14,6 +14,8 @@ ReactDOM.createRoot(document.getElementById('root')).render(
         <Route path="/" element={<App />}>
           {/* Rota Index (página inicial) dentro do layout */}
           <Route index element={<HomePage />} />
+          {/* Rota parceria com PrivacyMap (página inicial) dentro do layout */}
+          <Route path="privacymap" element={<HomePage />} />
           {/* Rota para o Dashboard dentro do layout */}
           <Route path="dashboard" element={<Dashboard />} />
         </Route>

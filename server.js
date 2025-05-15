@@ -25,7 +25,7 @@ const LiteWallet = require('./zingolib-wrapper/zingolib');
 const { TxBuilder } = require('./zingolib-wrapper/utils/utils');
 // const { join } = require('path');
 
-const { initializeDatabase, Transaction, Claim, Challenge } = require('./sequelize');
+const { initializeDatabase, Transaction, Claim, Challenge, Voucher } = require('./sequelize');
 const { Op, fn, col } = require('sequelize');
 
 const app = express();
@@ -82,15 +82,27 @@ zingo.init().then(async () => {
 
         console.log(`Queue: ${queue.length} | Sending: ${sendProgress} | Pending: ${pending}`);
         if(queue.length > 0 && !sendProgress && !pending) {
-            const sendJson = queue.flatMap((q) => {
-                const tx = new TxBuilder()
-                    .setRecipient(q.address)
-                    .setAmount(parseFloat(u_payout))
-                    .setMemo(memo);
+            const sendJson = (
+                await Promise.all(queue.map(async (q) => {
+                    let sendAmount = u_payout;
+                    let sendMemo = memo;
+                    
+                    const voucher = await Voucher.findOne({ where: { id: q.voucherId} } );
+                    if(voucher) {                    
+                        
+                        sendAmount = voucher.payout;
+                        sendMemo = voucher.memo;
+                    }
+                    
+                    const tx = new TxBuilder()
+                        .setRecipient(q.address)
+                        .setAmount(parseFloat(sendAmount))
+                        .setMemo(sendMemo);
 
-                return tx.getSendJSON();
-            });  
-
+                    return tx.getSendJSON();
+                }))
+            ).flat();            
+            
             zingo.sendTransaction(sendJson).then(async (txid)=>{
             // fakeSendTransaction(sendJson).then(async (txid)=>{                               
                 const totalValue = sendJson.map((el) => el.amount).reduce((acc, curr) => acc + curr, 0);
@@ -190,17 +202,19 @@ function getClientIp(req) {
     return req.ip; // Fallback to req.ip if no x-forwarded-for header
 };
 
-app.get ('/api/network', (req, res) =>{
+app.get('/api/network', (req, res) =>{
     res.json({
         net: network
     });
 });
 
-app.get ('/api/payout', (req, res) =>{
+app.get('/api/payout', async(req, res) =>{    
+    const voucherIsValid = await checkValidVoucher(req.query.voucher);
+    
     res.json({
         status: 200,
         payout: {
-            u_pay: u_payout,
+            u_pay: voucherIsValid.valid ? voucherIsValid.voucher.payout : u_payout,
             z_pay: z_payout,
             t_pay: t_payout
         }
@@ -312,6 +326,20 @@ app.get('/api/stats', async (req, res) => {
     res.json(result);
 });
 
+app.get('/api/voucher/:code', async (req, res) => { 
+    const voucher = await checkValidVoucher(req.params.code);
+    if(voucher.valid) {
+        return res.json({
+            status: 200,
+            message: `Your voucher is valid and will be applied to your claim!`,
+        });
+    }
+    res.json({
+        status: 404,
+        message: `This is not a valid voucher, or the voucher has expired.`,
+    });
+});
+
 const canClaim = async (address, ip) => {
     // Check if user awaited `waitTime` (even if user is still in the queue)
     const cutoffTime = new Date(Date.now() - waitTime * 60 * 1000);
@@ -344,6 +372,27 @@ const canClaim = async (address, ip) => {
         remaining: remainingMinutes
     };
 };
+
+const checkValidVoucher = async (voucherCode) => {        
+    try {        
+        const voucher = await Voucher.findOne({where: { code: voucherCode ? voucherCode.toUpperCase() : ''} });
+        if(voucher) {
+            return {
+                valid: true,
+                voucher: voucher
+            };
+        }
+        else {
+            throw(`Voucher not found: ${voucherCode}`)
+        }
+    }
+    catch(err) {
+        // console.log(err);
+        return {
+            valid: false
+        };
+    }
+}
 
 const checkValidPoW = async (token, userIp) => {
     const nonce = token.nonce;
@@ -400,6 +449,8 @@ const checkValidPoW = async (token, userIp) => {
 app.post('/api/challenge', async (req, res) => {
     // CHeck if it is a valid address
     const userAddr = req.body.address;
+    const voucherIsValid = await checkValidVoucher(req.body.voucher);
+    
     const userIp = getClientIp(req);    
     let isVpn = false;
 
@@ -460,8 +511,8 @@ app.post('/api/challenge', async (req, res) => {
                     }
                 });
                 console.log(`Faucet claims/hour: ${claimsPerHour}`);
-                const base = isVpn ? 20 : 5;
-                let baseDiff = Math.min(20, base + Math.floor(claimsPerHour / 3));
+                const base = isVpn ? 15 : 5;
+                let baseDiff = Math.min(15, base + Math.floor(claimsPerHour / 4));
 
                 // Get the total user claims (wallet address or IP)
                 let userClaimCount = await Claim.count({
@@ -473,7 +524,7 @@ app.post('/api/challenge', async (req, res) => {
                     }
                 });
                 const extraZeros = Math.floor(userClaimCount / 8);
-                const finalDiff = baseDiff + extraZeros;
+                const finalDiff = voucherIsValid.valid ? 6 : baseDiff + extraZeros;
                                
                 const now = new Date().toLocaleTimeString('en-US').replace(/\s/g, '-');
                 const msg = `${userAddr}-${userIp}-${now}` ;
@@ -524,17 +575,23 @@ app.post('/api/add', async (req, res) => {
     const userIp = getClientIp(req);
     const token = req.body.token;
     const tokenIsValid = await checkValidPoW(token, userIp);
+    const voucherIsValid = await checkValidVoucher(token.voucher);
     
     if(tokenIsValid) {                        
         // Add this claim to log file
         const timeStamp = new Date();
         logStream.write(`${timeStamp.toISOString()} | IP: ${new Date()} | Address: ${userAddr}\n\n`);
 
+        if(voucherIsValid.valid) {
+            console.log(`Using voucher ${voucherIsValid.voucher.code}`);
+        }
+
         try {
             await Claim.create({
                 address: userAddr,
                 ip: userIp,
-                pending: true,                
+                pending: true,
+                voucherId: voucherIsValid.valid ? voucherIsValid.voucher.id : null
             });
         }
         catch(err) {
@@ -548,7 +605,7 @@ app.post('/api/add', async (req, res) => {
 
         res.json({
             status: 200,
-            message: `Success! Your address was added to the queue, in a few minutes you will receive ${u_payout} ${network == 'test' ? 'TAZ' : 'ZEC'}.`,
+            message: `Success! Your address was added to the queue, in a few minutes you will receive ${voucherIsValid.valid ? voucherIsValid.voucher.payout : u_payout} ${network == 'test' ? 'TAZ' : 'ZEC'}.`,
         });
     }
     else {

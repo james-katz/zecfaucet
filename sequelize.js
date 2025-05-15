@@ -54,6 +54,26 @@ const Challenge = sequelize.define('challenge', {
     }
 });
 
+const Voucher = sequelize.define('voucher', {    
+    code: {
+      type: DataTypes.STRING,
+      unique: true,
+      allowNull: false,
+    },
+    payout: {
+        type: DataTypes.FLOAT,
+        allowNull: false,
+    },
+    memo: {
+        type: DataTypes.STRING,
+        allowNull: false,
+    },
+    max_supply: {
+      type: DataTypes.INTEGER,
+      allowNull: false,
+    }
+});
+
 // Setup relationships
 Transaction.hasMany(Claim);
 Claim.belongsTo(Transaction, {
@@ -62,6 +82,14 @@ Claim.belongsTo(Transaction, {
         allowNull: true  // <== Important
     },
     targetKey: 'txid'
+});
+
+Voucher.hasMany(Claim, { foreignKey: 'voucherId' });
+Claim.belongsTo(Voucher, { 
+    foreignKey: {
+        name: 'voucherId', 
+        allowNull: true 
+    }
 });
 
 // reset database
@@ -90,4 +118,4 @@ const initializeDatabase = async () => {
     }
 };
 
-module.exports = { sequelize, initializeDatabase, resetDatabase, Transaction, Claim, Challenge };
+module.exports = { sequelize, initializeDatabase, resetDatabase, Transaction, Claim, Challenge, Voucher };

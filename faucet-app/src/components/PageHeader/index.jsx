@@ -12,14 +12,16 @@ export default function Header({coin}) {
     t_pay: 0
   });
 
-  useEffect(() => {    
+  const [voucher, setVoucher] = useState('');
 
-    httpCommon.get('/payout').then((res) => {
+  useEffect(() => {    
+    httpCommon.get(`/payout?voucher=${voucher}`).then((res) => {
       if(res.data && res.data.status == 200) {        
+        console.log(res.data)
         setFaucetPayout(res.data.payout)
       }
     });
-  }, []);
+  }, [voucher]);
 
   return (
     <div className="header-wrapper">
@@ -69,7 +71,7 @@ export default function Header({coin}) {
           <img src={logo} alt="ZecFaucet logo" />
         </div>        
       </header>      
-      <FaucetClaim />
+      <FaucetClaim applyVoucher={setVoucher} />
     </div>
   );
 }

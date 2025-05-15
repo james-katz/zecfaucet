@@ -35,7 +35,7 @@ export default function ProofOfWorkModal({ visible, onDecline, onSuccess, challe
         bestEffort.current = { nonce: 0, hash: 'f'.repeat(64) };
         startTime.current = Date.now();
 
-        const timeCap = isVpn ? 2*75*1000 : 75*1000;
+        const timeCap = isVpn ? 2*60*1000 : 60*1000;
         const minTime = 5000 + Math.random() * 2500;
         const maxTime = Math.min(timeCap, Math.floor(minTime * Math.pow(1.44, difficulty - 5)));
 
@@ -107,8 +107,8 @@ export default function ProofOfWorkModal({ visible, onDecline, onSuccess, challe
         setCompleted(false);        
         setDuration(0);
         setHashRate(0);
-        console.log(hash)
-        console.log(nonce)
+        // console.log(hash)
+        // console.log(nonce)
         onSuccess({ nonce, hash }); // should also send the solution hash
     }
 

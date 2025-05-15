@@ -15,7 +15,7 @@ export default function FaucetClaim( { applyVoucher } ) {
   const { pathname } = useLocation();
   
   useEffect(() => {
-    if(pathname === '/privacymap') {
+    if(pathname === '/vitorpio') {
       setVoucher('zcash2025');
       applyVoucher('zcash2025');
     }

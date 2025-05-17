@@ -143,6 +143,7 @@ zingo.init().then(async () => {
         if(sendProgress) return;
         
         const lastDbTxid = await Transaction.findAll({
+            where: { kind: 'received' },
             order: [['createdAt', 'DESC']],
             limit: 1
         });

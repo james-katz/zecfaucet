@@ -6,18 +6,20 @@ import PageHeader from "./components/PageHeader";
 import DonateSection from "./components/FaucetBalance";
 import FaucetStats from "./components/FaucetStats";
 import About from "./components/About";
+import { GoogleReCaptchaProvider } from 'react-google-recaptcha-v3';
 
 // Este componente representa o conteúdo da página inicial
 export default function HomePage() {
   const { coinName } = useOutletContext();
 
   return (
-    <>
-      <PageHeader coin={coinName}/>
-      <DonateSection coin={coinName}/>
-      <FaucetStats coin={coinName} />
-      <About />
-    </>
+    <GoogleReCaptchaProvider
+      reCaptchaKey="6LckEEgrAAAAAO4sSoOtKsNtVlKFl6DyraY69LPe">
+        <PageHeader coin={coinName}/>
+        <DonateSection coin={coinName}/>
+        <FaucetStats coin={coinName} />
+        <About />
+    </GoogleReCaptchaProvider>
   );
 }
 

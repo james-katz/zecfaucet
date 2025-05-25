@@ -2,7 +2,6 @@ import { useState, useEffect } from 'react';
 import { Outlet } from 'react-router-dom'; // Importar Outlet
 import httpCommon from './http-common';
 import { Toaster } from 'react-hot-toast';
-import PageHeader from "./components/PageHeader";
 
 export default function App() {
   const [faucetOffline, setFaucetOffline] = useState(false);

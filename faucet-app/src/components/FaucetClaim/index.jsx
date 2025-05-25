@@ -6,7 +6,7 @@ import httpCommon from '../../http-common';
 import './index.css';
 import VoucherModal from '../VoucherModal';
 
-import { GoogleReCaptchaProvider, GoogleReCaptcha } from "react-google-recaptcha-v3";
+import { useGoogleReCaptcha } from 'react-google-recaptcha-v3';
 
 export default function FaucetClaim( { applyVoucher } ) {
   const [userAddress, setUserAddress] = useState('');
@@ -16,8 +16,9 @@ export default function FaucetClaim( { applyVoucher } ) {
   const [voucherModalVisible, setVoucherModalVisible] = useState(false);
   const [voucher, setVoucher] = useState('');
 
-  const [captchaToken, setCaptchaToken] = useState("");
-  const [refreshReCaptcha, setRefreshReCaptcha] = useState(false);
+  const [canClick, setCanClick] = useState(false);
+
+  const { executeRecaptcha } = useGoogleReCaptcha();
 
   // const { pathname } = useLocation();
   
@@ -26,6 +27,8 @@ export default function FaucetClaim( { applyVoucher } ) {
     //   setVoucher('zcash2025');
     //   applyVoucher('zcash2025');
     // }
+
+    setCanClick(true);
   },[]);
 
   const handleInputChange = (e) => {
@@ -45,8 +48,13 @@ export default function FaucetClaim( { applyVoucher } ) {
     setVoucherModalVisible(false);
   }
 
-  const handleSubmit = () => {
+  const handleSubmit = async() => {
     if (!userAddress) return toast.error('Please enter a Zcash Unified address!');
+    
+    setCanClick(false);
+
+    const captchaToken = await executeRecaptcha('claim');
+
     httpCommon.post('/challenge', { address: userAddress, voucher: voucher, token: captchaToken } ).then((res) => {
       if(res.data && res.data.status == 200) {        
         setChallenge({
@@ -56,14 +64,13 @@ export default function FaucetClaim( { applyVoucher } ) {
           vpn: res.data.message.vpn
         });
         setModalVisible(true);
-        setRefreshReCaptcha(res.data.message.id);    
       }
       else if(res.data && res.data.message) {
-        setRefreshReCaptcha(res.data.message);
+        setCanClick(true);
         toast.error(res.data.message);
       }
       else {
-        setRefreshReCaptcha(false);
+        setCanClick(true);
         toast.error("Service unavailable.");
       }
     });
@@ -71,6 +78,8 @@ export default function FaucetClaim( { applyVoucher } ) {
 
   const handleSuccess = ({ nonce, hash }) => {
     setModalVisible(false);
+    setCanClick(true);
+
     const token = {
       id: challenge.id,
       nonce: nonce,
@@ -78,7 +87,7 @@ export default function FaucetClaim( { applyVoucher } ) {
       voucher: voucher
     };    
     // console.log(token);
-
+    
     httpCommon.post('/add', { address: userAddress, token: token } ).then((res) => {
           if(res.data && res.data.status == 200) {
             toast.success(res.data.message);
@@ -89,14 +98,9 @@ export default function FaucetClaim( { applyVoucher } ) {
         });
   };
 
-  const handleOnVerify = (getToken) => {
-    setCaptchaToken(getToken);
-  };
-
   return (
     <div className="faucet-claim">
-      <a href="#" className="coupon-button" onClick={handleVoucherModal}>🏷️ Apply coupon {voucher ? `(${voucher.toUpperCase()})` : ``}</a>
-      {/* <form> */}
+      {/* <a href="#" className="coupon-button" onClick={handleVoucherModal}>🏷️ Apply coupon {voucher ? `(${voucher.toUpperCase()})` : ``}</a> */}
       <input
         type="text"
         placeholder="Insert your wallet address here"
@@ -104,22 +108,19 @@ export default function FaucetClaim( { applyVoucher } ) {
         onChange={handleInputChange}
         className="faucet-input"
       />
-      <button onClick={handleSubmit} className="faucet-button" disabled={captchaToken == ''}>
-        {captchaToken == '' ? ("Please wait ..."):("SEND NOW")}
-      </button>   
-      {/* Google's reCaptcha v3 */}
-      <GoogleReCaptchaProvider reCaptchaKey="6LckEEgrAAAAAO4sSoOtKsNtVlKFl6DyraY69LPe">
-          <GoogleReCaptcha            
-            onVerify={handleOnVerify}
-            refreshReCaptcha={refreshReCaptcha}
-          />
-      </GoogleReCaptchaProvider>
-      {/* </form> */}
+      <button onClick={handleSubmit} className="faucet-button" disabled={!canClick}>
+        {canClick ? ("SEND NOW"):("Please wait ...")}        
+      </button>         
+
       {/* Modals */}
       <ProofOfWorkModal
         visible={modalVisible}
         challenge={challenge}
-        onDecline={() => setModalVisible(false)}
+        onDecline={() => {
+            setCanClick(true);          
+            setModalVisible(false);
+          }
+        }
         onSuccess={handleSuccess}
       />
 

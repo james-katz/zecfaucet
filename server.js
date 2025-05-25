@@ -9,7 +9,7 @@ const axios = require('axios');
 const crypto = require('crypto');
 
 const https = require('https');
-// const fs = require('fs');
+const fs = require('fs');
 
 const path = require('path');
 const dotenv = require('dotenv');
@@ -100,8 +100,8 @@ zingo.init().then(async () => {
                     return tx.getSendJSON();
                 }))
             ).flat();
-            console.log(sendJson);
-            return;
+            // console.log(sendJson);
+            
             zingo.sendTransaction(sendJson).then(async (txid)=>{
             // fakeSendTransaction(sendJson).then(async (txid)=>{                               
                 const totalValue = sendJson.map((el) => el.amount).reduce((acc, curr) => acc + curr, 0);
@@ -486,6 +486,7 @@ app.post('/api/challenge', async (req, res) => {
                 const captcha = await axios.post("https://www.google.com/recaptcha/api/siteverify", params);                
                 if(captcha.data.success) {
                     console.log(`User has a reCaptcha score of ${captcha.data.score}`);
+                    // console.log(captcha.data)
                     if (useRecaptcha && captcha.data.score <= 0.3) {
                         console.log(`User blocked due to low score.`);
                         res.send({

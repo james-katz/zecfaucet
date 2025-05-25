@@ -484,7 +484,7 @@ app.post('/api/challenge', async (req, res) => {
                 params.append('response', reCaptchaToken);
                 params.append('remoteip', ipAddress);
                 const captcha = await axios.post("https://www.google.com/recaptcha/api/siteverify", params);                
-                if(captcha.data.success) {
+                if(captcha.data.success && captcha.data.action == 'claim') {
                     console.log(`User has a reCaptcha score of ${captcha.data.score}`);
                     // console.log(captcha.data)
                     if (useRecaptcha && captcha.data.score <= 0.3) {
@@ -495,6 +495,14 @@ app.post('/api/challenge', async (req, res) => {
                         });
                         return;
                     }
+                }
+                else {
+                    console.log(`User blocked due to invalid captcha.`);
+                    res.send({
+                        status: 403,
+                        message: `Sorry, we couldn't verify you're not a robot.`
+                    });
+                    return;
                 }
                 
                 const proxyOrVpn = await axios.get(`http://check.getipintel.net/check.php?ip=${ipAddress}&contact=james.j.katz@protonmail.com`);

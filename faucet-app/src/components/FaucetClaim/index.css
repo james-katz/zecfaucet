@@ -27,6 +27,15 @@
     border-radius: 999px;
     cursor: pointer;
 }
+
+.coupon-button {
+    padding: 1rem 1rem;
+    /* font-size: 1.25rem; */
+    /* font-weight: bold; */
+    color: #775700;    
+    cursor: pointer;
+    text-decoration: none;
+}
   
 .faucet-button:hover {
     background: linear-gradient(to right, #ffcc00, #ffaa00);

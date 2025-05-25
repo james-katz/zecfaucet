@@ -1,3 +1,32 @@
+.dashboard-wrapper {
+  display: flex;
+  flex-direction: row;
+}
+
+.dashboard-side-menu {
+  min-width: 300px;
+  background-color: #555;
+}
+
+.dashboard-side-menu-links {
+  list-style: none;
+  display: flex;
+  flex-direction: column;
+  gap: 1rem;
+  width: 100%;
+}
+
+.dashboard-side-menu-links li {
+  font-size: 1.8rem;
+  color:aliceblue;
+  height: 2rem;
+  
+}
+
+.dashboard-content {
+  flex: 1;
+}
+
 .dashboard-section {
     padding: 2rem;
     background-color: #f0f0f0; /* Cor de fundo suave */

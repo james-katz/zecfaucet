@@ -1,4 +1,4 @@
-const { Worker } = require('worker_threads');
+// const { Worker } = require('worker_threads');
 
 const express = require('express');
 const bodyParser = require('body-parser')
@@ -9,7 +9,7 @@ const axios = require('axios');
 const crypto = require('crypto');
 
 const https = require('https');
-const fs = require('fs');
+// const fs = require('fs');
 
 const path = require('path');
 const dotenv = require('dotenv');
@@ -20,6 +20,9 @@ const network = process.env.NETWORK;
 
 const useHttps = process.env.USE_HTTPS === "true";
 const blockVpn = process.env.BLOCK_VPN === "true";
+
+const reCaptchaKey = process.env.RECAPTCHA_SECRET_KEY;
+const useRecaptcha = process.env.USE_RECAPTCHA;
 
 const LiteWallet = require('./zingolib-wrapper/zingolib');
 const { TxBuilder } = require('./zingolib-wrapper/utils/utils');
@@ -39,7 +42,7 @@ const t_payout = network == "main" ? 0.0003 : 0.1;
 const memo = `Thanks for using ${network == 'test' ? 'testnet.' : ''}ZecFaucet.com`;
 
 // Queue for the faucet payout
-const waitTime = 60; // Time in minuts before next claim
+const waitTime = 90; // Time in minuts before next claim
 const payInterval = 3; // Time in minuts between payments
 
 app.use(bodyParser.urlencoded({ extended: true }));
@@ -49,7 +52,6 @@ app.set("trust proxy", true);
 
 // Setup zingolib
 const zingo = new LiteWallet(lwd_url, network, false);
-let logStream;
 
 const fakeSendTransaction = (foo) => {
     return new Promise((resolve, reject) => {
@@ -63,9 +65,6 @@ const fakeSendTransaction = (foo) => {
 zingo.init().then(async () => {    
     //initialize the database
     await initializeDatabase();
-
-    // Start the logger
-    logStream = fs.createWriteStream("log.txt", {flags:'a'});
 
     // Send payments every 3 minutes
     const timerID = setInterval(async() => {
@@ -88,8 +87,7 @@ zingo.init().then(async () => {
                     let sendMemo = memo;
                     
                     const voucher = await Voucher.findOne({ where: { id: q.voucherId} } );
-                    if(voucher) {                    
-                        
+                    if(voucher) {                                            
                         sendAmount = voucher.payout;
                         sendMemo = voucher.memo;
                     }
@@ -101,8 +99,9 @@ zingo.init().then(async () => {
 
                     return tx.getSendJSON();
                 }))
-            ).flat();            
-            
+            ).flat();
+            console.log(sendJson);
+            return;
             zingo.sendTransaction(sendJson).then(async (txid)=>{
             // fakeSendTransaction(sendJson).then(async (txid)=>{                               
                 const totalValue = sendJson.map((el) => el.amount).reduce((acc, curr) => acc + curr, 0);
@@ -128,8 +127,6 @@ zingo.init().then(async () => {
                     console.log("Couldn't add new tx to database");
                     // console.log(err);
                 }
-                
-                logStream.write(`txid: ${txid}\n============\n`);
             }).catch((err) => {
                 console.log(err);
                 process.kill(process.pid, "SIGINT");
@@ -143,7 +140,7 @@ zingo.init().then(async () => {
         if(sendProgress) return;
         
         const lastDbTxid = await Transaction.findAll({
-            where: { kind: 'received' },
+            // where: { kind: 'received' },
             order: [['createdAt', 'DESC']],
             limit: 1
         });
@@ -327,17 +324,19 @@ app.get('/api/stats', async (req, res) => {
     res.json(result);
 });
 
-app.get('/api/voucher/:code', async (req, res) => { 
-    const voucher = await checkValidVoucher(req.params.code);
+app.get('/api/voucher', async (req, res) => { 
+    const voucher = await checkValidVoucher(req.query.code);
     if(voucher.valid) {
         return res.json({
             status: 200,
-            message: `Your voucher is valid and will be applied to your claim!`,
+            message: voucher.hint,
+            value: voucher.voucher.payout
         });
     }
     res.json({
         status: 404,
         message: `This is not a valid voucher, or the voucher has expired.`,
+        value: u_payout
     });
 });
 
@@ -378,8 +377,22 @@ const checkValidVoucher = async (voucherCode) => {
     try {        
         const voucher = await Voucher.findOne({where: { code: voucherCode ? voucherCode.toUpperCase() : ''} });
         if(voucher) {
+            const usageCount = await Claim.count({
+                where: {
+                  voucherId: voucher.id
+                }
+            });
+
+            if (usageCount > voucher.max_supply) {
+                return {
+                    valid: false,
+                    hint: "This coupom is no longer available."
+                };
+            }
+
             return {
                 valid: true,
+                hint: `Your coupom is valid and will be applied to your claim!`,
                 voucher: voucher
             };
         }
@@ -390,7 +403,8 @@ const checkValidVoucher = async (voucherCode) => {
     catch(err) {
         // console.log(err);
         return {
-            valid: false
+            valid: false,
+            hint: err.toString()
         };
     }
 }
@@ -450,6 +464,7 @@ const checkValidPoW = async (token, userIp) => {
 app.post('/api/challenge', async (req, res) => {
     // CHeck if it is a valid address
     const userAddr = req.body.address;
+    const reCaptchaToken = req.body.token;
     const voucherIsValid = await checkValidVoucher(req.body.voucher);
     
     const userIp = getClientIp(req);    
@@ -459,22 +474,47 @@ app.post('/api/challenge', async (req, res) => {
     if(validAddr && validAddr.address_kind === 'unified' && validAddr.chain_name == network) {
         const userCanClaim = await canClaim(userAddr, userIp);
         if (userCanClaim.allowed) {
-            // Before anything, check if user is using proxy/vpn            
+            // Check if user is using proxy/vpn,            
             try {        
                 const ipAddress = userIp.match(/(\d{1,3}\.\d{1,3}\.\d{1,3}\.\d{1,3})$/)[0];             
-                const proxyOrVpn = await axios.get(`http://check.getipintel.net/check.php?ip=${ipAddress}&contact=james.j.katz@protonmail.com`);
-                if(proxyOrVpn.data > 0.90) {
-                    console.log("VPN/Proxy detected. Using a harder challenge!");
-                    isVpn = true;
-                    if(blockVpn) {
-                        const timeStamp = new Date();
-                        logStream.write(`${timeStamp.toISOString()} | Proxy or VPN blocked: ${userIp}\n\n`);
+                
+                // Buf first of all, check reCaptcha v3 token
+                const params = new URLSearchParams();
+                params.append('secret', reCaptchaKey);
+                params.append('response', reCaptchaToken);
+                params.append('remoteip', ipAddress);
+                const captcha = await axios.post("https://www.google.com/recaptcha/api/siteverify", params);                
+                if(captcha.data.success) {
+                    console.log(`User has a reCaptcha score of ${captcha.data.score}`);
+                    if (useRecaptcha && captcha.data.score <= 0.3) {
+                        console.log(`User blocked due to low score.`);
                         res.send({
                             status: 403,
                             message: `Sorry, we couldn't verify you're not a robot.`
                         });
                         return;
-                    }                    
+                    }
+                }
+                
+                const proxyOrVpn = await axios.get(`http://check.getipintel.net/check.php?ip=${ipAddress}&contact=james.j.katz@protonmail.com`);
+                if(proxyOrVpn.data > 0.90) {
+                    console.log("VPN/Proxy detected. Using a harder challenge!");
+                    isVpn = true;
+                    if(blockVpn) {                        
+                        res.send({
+                            status: 403,
+                            message: `Sorry, we couldn't verify you're not a robot.`
+                        });
+                        return;
+                    }
+                    // Do not allow VPN users to use a voucher
+                    if(voucherIsValid.valid) {
+                        res.send({
+                            status: 403,
+                            message: `Please disable your VPN in order to use this coupon.`
+                        });
+                        return;
+                    }     
                 }                
             }
             catch(err) {
@@ -491,8 +531,10 @@ app.post('/api/challenge', async (req, res) => {
             });
             const fee = await zingo.getDefaultFee() * queue.length;
             const queueSum = queue.map((el) => el.amount).reduce((acc, curr) => acc + curr, fee);
-            
-            if((queueSum + u_payout) * 2 >= (bal * 10**8)) {
+            const pay = voucherIsValid.valid ? voucherIsValid.voucher.payout : u_payout;
+            // console.log(`Faucet balance: ${bal}, Queue sum: ${queueSum}, adding ${pay} to the queue`);
+
+            if((queueSum + pay) * 2 > bal) {
                 res.send({
                     status: 503,
                     message: `It looks like the faucet wallet don't have enough funds 🥹`
@@ -579,10 +621,6 @@ app.post('/api/add', async (req, res) => {
     const voucherIsValid = await checkValidVoucher(token.voucher);
     
     if(tokenIsValid) {                        
-        // Add this claim to log file
-        const timeStamp = new Date();
-        logStream.write(`${timeStamp.toISOString()} | IP: ${new Date()} | Address: ${userAddr}\n\n`);
-
         if(voucherIsValid.valid) {
             console.log(`Using voucher ${voucherIsValid.voucher.code}`);
         }
@@ -633,8 +671,7 @@ else {
 }
 
 process.on('SIGINT', async () => {
-    console.log("Safely shutdown zingolib");
-    logStream.end();
+    console.log("Safely shutdown zingolib");    
     await zingo.deinitialize();
     process.exit();
 });

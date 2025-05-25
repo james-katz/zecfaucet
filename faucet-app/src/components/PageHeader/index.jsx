@@ -15,10 +15,15 @@ export default function Header({coin}) {
   const [voucher, setVoucher] = useState('');
 
   useEffect(() => {    
-    httpCommon.get(`/payout?voucher=${voucher}`).then((res) => {
-      if(res.data && res.data.status == 200) {        
-        console.log(res.data)
-        setFaucetPayout(res.data.payout)
+    
+    httpCommon.get(`/voucher?code=${voucher}`).then((res) => {
+      if(res.data) {        
+        
+        setFaucetPayout({
+          u_pay: res.data.value,
+          z_pay: 0,
+          t_pay: 0
+        });
       }
     });
   }, [voucher]);

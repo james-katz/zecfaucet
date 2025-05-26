@@ -22,7 +22,7 @@ const useHttps = process.env.USE_HTTPS === "true";
 const blockVpn = process.env.BLOCK_VPN === "true";
 
 const reCaptchaKey = process.env.RECAPTCHA_SECRET_KEY;
-const useRecaptcha = process.env.USE_RECAPTCHA;
+const useRecaptcha = process.env.USE_RECAPTCHA === "true";
 
 const LiteWallet = require('./zingolib-wrapper/zingolib');
 const { TxBuilder } = require('./zingolib-wrapper/utils/utils');
@@ -469,6 +469,7 @@ app.post('/api/challenge', async (req, res) => {
     
     const userIp = getClientIp(req);    
     let isVpn = false;
+    let reScore = 1.0;
 
     const validAddr = await zingo.parseAddress(userAddr);
     if(validAddr && validAddr.address_kind === 'unified' && validAddr.chain_name == network) {
@@ -485,9 +486,10 @@ app.post('/api/challenge', async (req, res) => {
                 params.append('remoteip', ipAddress);
                 const captcha = await axios.post("https://www.google.com/recaptcha/api/siteverify", params);                
                 if(captcha.data.success && captcha.data.action == 'claim') {
-                    console.log(`User has a reCaptcha score of ${captcha.data.score}`);
+                    reScore = captcha.data.score;
+                    console.log(`User has a reCaptcha score of ${reScore}`);
                     // console.log(captcha.data)
-                    if (useRecaptcha && captcha.data.score <= 0.3) {
+                    if (useRecaptcha && reScore <= 0.3) {
                         console.log(`User blocked due to low score.`);
                         res.send({
                             status: 403,
@@ -564,8 +566,11 @@ app.post('/api/challenge', async (req, res) => {
                 });
                 console.log(`Faucet claims/hour: ${claimsPerHour}`);
                 const base = isVpn ? 15 : 5;
-                let baseDiff = Math.min(15, base + Math.floor(claimsPerHour / 4));
+                let baseDiff = Math.min(15, base + Math.floor(claimsPerHour / 8));
 
+                const reScoreCapped = Math.max(0.3, Math.min(1.0, reScore));
+                baseDiff += Math.round(((1.0 - reScoreCapped) / 0.7) * 3);
+                
                 // Get the total user claims (wallet address or IP)
                 let userClaimCount = await Claim.count({
                     where: {
@@ -575,8 +580,8 @@ app.post('/api/challenge', async (req, res) => {
                         ]
                     }
                 });
-                const extraZeros = Math.floor(userClaimCount / 8);
-                const finalDiff = voucherIsValid.valid ? 6 : baseDiff + extraZeros;
+                const extraZeros = Math.floor(userClaimCount / 20);
+                const finalDiff = baseDiff + extraZeros;
                                
                 const now = new Date().toLocaleTimeString('en-US').replace(/\s/g, '-');
                 const msg = `${userAddr}-${userIp}-${now}` ;

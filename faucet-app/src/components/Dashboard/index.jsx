@@ -1,18 +1,20 @@
 import Dashboard from './Dashboard';
+import logo from '../../images/zecfaucet_2.0.gif';
 import './index.css';
 
 export default function DashboardPage() {  
   return (        
     <div className="dashboard-wrapper">
         <div className='dashboard-side-menu'>
-            <ul className='dashboard-side-menu-links'>
-                <li>
+            <img src={logo} className='sidemenu-logo' />
+            <div className='dashboard-side-menu-links'>
+                <button>
                     Statistics
-                </li>
-                <li>
+                </button>
+                <button>
                     Vouchers
-                </li>
-            </ul>
+                </button>
+            </div>
         </div>
         <div className='dashboard-content'>
             <Dashboard />

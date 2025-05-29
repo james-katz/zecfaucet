@@ -78,7 +78,7 @@ zingo.init().then(async () => {
                 pending: true
             }
         });
-
+        
         console.log(`Queue: ${queue.length} | Sending: ${sendProgress} | Pending: ${pending}`);
         if(queue.length > 0 && !sendProgress && !pending) {
             const sendJson = (
@@ -434,6 +434,16 @@ const checkValidPoW = async (token, userIp) => {
 
             const userIpChallenge = message.split('-')[1];
     
+            // Block if user took too long to verify
+            const challengeTimestamp = new Date(challenge.createdAt);
+            const now = new Date();
+            if (challengeTimestamp < now - 3 * 60 * 1000) {
+                console.log(`User took too long to verify the challenge`);
+                await challenge.destroy();
+                return false;
+            }
+
+            // Block if IP address changed.
             if(userIpChallenge != userIp) {
                 console.log("IP mismatch. Claim was blocked!");
                 await challenge.destroy();
@@ -509,7 +519,7 @@ app.post('/api/challenge', async (req, res) => {
                 
                 const proxyOrVpn = await axios.get(`http://check.getipintel.net/check.php?ip=${ipAddress}&contact=james.j.katz@protonmail.com`);
                 if(proxyOrVpn.data > 0.90) {
-                    console.log("VPN/Proxy detected. Using a harder challenge!");
+                    console.log("VPN/Proxy detected.");
                     isVpn = true;
                     if(blockVpn) {                        
                         res.send({
@@ -634,7 +644,7 @@ app.post('/api/add', async (req, res) => {
     const tokenIsValid = await checkValidPoW(token, userIp);
     const voucherIsValid = await checkValidVoucher(token.voucher);
     
-    if(tokenIsValid) {                        
+    if(tokenIsValid && userIp) {                        
         if(voucherIsValid.valid) {
             console.log(`Using voucher ${voucherIsValid.voucher.code}`);
         }

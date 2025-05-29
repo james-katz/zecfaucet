@@ -438,14 +438,14 @@ const checkValidPoW = async (token, userIp) => {
             const challengeTimestamp = new Date(challenge.createdAt);
             const now = new Date();
             if (challengeTimestamp < now - 3 * 60 * 1000) {
-                console.log(`User took too long to verify the challenge`);
+                console.log(`User took too long to verify challenge id ${challenge.id}`);
                 await challenge.destroy();
                 return false;
             }
 
             // Block if IP address changed.
             if(userIpChallenge != userIp) {
-                console.log("IP mismatch. Claim was blocked!");
+                console.log(`IP mismatch. Claim was blocked for challenge ${challenge.id}!`);
                 await challenge.destroy();
                 return false;
             }

@@ -74,6 +74,18 @@ const Voucher = sequelize.define('voucher', {
     }
 });
 
+const User = sequelize.define('user', {
+    username: {
+        type: DataTypes.STRING,
+        unique: true,
+        allowNull: false,
+    },
+    password: {
+        type: DataTypes.STRING,
+          allowNull: false,
+    }
+});
+
 // Setup relationships
 Transaction.hasMany(Claim);
 Claim.belongsTo(Transaction, {
@@ -91,6 +103,9 @@ Claim.belongsTo(Voucher, {
         allowNull: true 
     }
 });
+
+User.hasMany(Voucher);
+Voucher.belongsTo(User);
 
 // reset database
 const resetDatabase = async () => {
@@ -118,4 +133,4 @@ const initializeDatabase = async () => {
     }
 };
 
-module.exports = { sequelize, initializeDatabase, resetDatabase, Transaction, Claim, Challenge, Voucher };
+module.exports = { sequelize, initializeDatabase, resetDatabase, Transaction, Claim, Challenge, Voucher, User };

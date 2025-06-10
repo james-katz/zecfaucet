@@ -18,8 +18,9 @@ ReactDOM.createRoot(document.getElementById('root')).render(
           <Route path="dashboard" element={<Dashboard />} />
           {/* Rota para URLs inválidas */}
           <Route path="*" element={<Navigate to="/" replace />} />
-        </Route>
-        {/* Adicione outras rotas de nível superior aqui, se necessário */}
+          {/* Rota de testes */}
+          <Route path="test" element={<HomePage />} />
+        </Route>        
       </Routes>
     </Router>
   </React.StrictMode>

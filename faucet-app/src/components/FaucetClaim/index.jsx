@@ -2,7 +2,7 @@ import { useEffect, useState } from 'react';
 import { toast } from 'react-hot-toast';
 import ProofOfWorkModal from '../ProofOfWorkModal';
 import httpCommon from '../../http-common';
-// import { useLocation } from 'react-router-dom';
+import { useLocation } from 'react-router-dom';
 import './index.css';
 import VoucherModal from '../VoucherModal';
 
@@ -12,21 +12,23 @@ export default function FaucetClaim( { applyVoucher } ) {
   const [userAddress, setUserAddress] = useState('');
   const [modalVisible, setModalVisible] = useState(false);
   const [challenge, setChallenge] = useState({});
-  
+
   const [voucherModalVisible, setVoucherModalVisible] = useState(false);
   const [voucher, setVoucher] = useState('');
+
+  const [enableVoucher, setEnableVoucher] = useState(false);
 
   const [canClick, setCanClick] = useState(false);
 
   const { executeRecaptcha } = useGoogleReCaptcha();
 
-  // const { pathname } = useLocation();
+  const { pathname } = useLocation();
   
   useEffect(() => {
-    // if(pathname === '/vitorpio') {
-    //   setVoucher('zcash2025');
-    //   applyVoucher('zcash2025');
-    // }
+    if(pathname === '/test') {
+      console.log('Enabling voucher...')
+      setEnableVoucher(true);
+    }
 
     setCanClick(true);
   },[]);
@@ -100,7 +102,10 @@ export default function FaucetClaim( { applyVoucher } ) {
 
   return (
     <div className="faucet-claim">
-      {/* <a href="#" className="coupon-button" onClick={handleVoucherModal}>🏷️ Apply coupon {voucher ? `(${voucher.toUpperCase()})` : ``}</a> */}
+      {enableVoucher && (
+        <a href="#" className="coupon-button" onClick={handleVoucherModal}>🏷️ Apply coupon {voucher ? `(${voucher.toUpperCase()})` : ``}</a>
+      )}
+
       <input
         type="text"
         placeholder="Insert your wallet address here"

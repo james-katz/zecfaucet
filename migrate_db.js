@@ -1,12 +1,15 @@
-const { Transaction, resetDatabase } = require('./sequelize');
+const { Transaction, User, resetDatabase } = require('./sequelize');
 const LiteWallet = require('./zingolib-wrapper/zingolib');
+
+const dotenv = require('dotenv');
+dotenv.config();
 
 async function migrate_db() {
     console.log("Migrating db");
     await resetDatabase();
 
-    const dotenv = require('dotenv');
-    dotenv.config();
+    const seedUser = process.env.SEED_USERNAME;
+    const seedPwd = process.env.SEED_PASSWORD;
 
     const lwd_url = process.env.LWD_URL;
     const network = process.env.NETWORK;
@@ -56,6 +59,12 @@ async function migrate_db() {
                 }
             }
         }
+
+        await User.create({
+            username: seedUser,
+            password: seedPwd
+        })
+
         console.log("Done!");
         process.exit();
     }).catch((err) => { console.log(err) });

@@ -5,8 +5,9 @@ export default function ProofOfWorkModal({ visible, onDecline, onSuccess, challe
     const [accepted, setAccepted] = useState(false);
     const [completed, setCompleted] = useState(false);    
     const [message, setMessage] = useState('');    
-    const [difficulty, setDifficulty] = useState(0);
+    const [difficulty, setDifficulty] = useState(0);    
     const [isVpn, setIsVpn] = useState(false);
+    const [invertBtns, setInvertBtns] = useState(false);
     const [nonce, setNonce] = useState(0);
     const [hash, setHash] = useState(0);
     const [progress, setProgress] = useState('Initializing ...');
@@ -117,6 +118,8 @@ export default function ProofOfWorkModal({ visible, onDecline, onSuccess, challe
         setDifficulty(challenge.difficulty);
         setIsVpn(challenge.vpn);
         
+        setInvertBtns(Math.random() >= 0.5);
+
         document.body.style.overflow = visible ? 'hidden' : 'auto';
         return () => {
             document.body.style.overflow = 'auto';
@@ -138,8 +141,17 @@ export default function ProofOfWorkModal({ visible, onDecline, onSuccess, challe
                         Keep in mind this process can take a few seconds to minutes to complete and may incur in high CPU usage and added electricity costs.
                     </p>                    
                     <div className="pow-buttons">
-                    <button onClick={declineChallenge} className="btn-decline">Decline</button>
-                        <button onClick={startChallenge} className="btn-accept">Accept Challenge</button>
+                        {invertBtns ? (
+                            <>
+                                <button onClick={startChallenge} className="btn-accept">Accept Challenge</button>
+                                <button onClick={declineChallenge} className="btn-decline">Decline</button>                        
+                            </>
+                        ) : (
+                            <>
+                                <button onClick={declineChallenge} className="btn-decline">Decline</button>
+                                 <button onClick={startChallenge} className="btn-accept">Accept Challenge</button>
+                            </>
+                        )}                        
                     </div>
                 </>
             )}

@@ -8,6 +8,9 @@ const axios = require('axios');
 
 const crypto = require('crypto');
 
+const jwt = require('jsonwebtoken');
+const SECRET_KEY = 'your-secret-key'; // Store securely in .env
+
 const https = require('https');
 const fs = require('fs');
 
@@ -28,8 +31,8 @@ const LiteWallet = require('./zingolib-wrapper/zingolib');
 const { TxBuilder } = require('./zingolib-wrapper/utils/utils');
 // const { join } = require('path');
 
-const { initializeDatabase, Transaction, Claim, Challenge, Voucher } = require('./sequelize');
-const { Op, fn, col } = require('sequelize');
+const { initializeDatabase, Transaction, Claim, Challenge, Voucher, User } = require('./sequelize');
+const { Op, fn, col, Sequelize } = require('sequelize');
 
 const app = express();
 const port = 2653;
@@ -461,6 +464,11 @@ const checkValidPoW = async (token, userIp) => {
                 await challenge.destroy();
                 return true;
             }
+            else {
+                console.log(`Wrong hash for challenge id ${challenge.id}`);                
+                await challenge.destroy();
+                return false;
+            }
         }       
     }
     catch(err) {
@@ -468,6 +476,7 @@ const checkValidPoW = async (token, userIp) => {
         return false;
     }
 
+    console.log(`Failed to validate challenge.`);
     return false;
 }
 
@@ -529,7 +538,7 @@ app.post('/api/challenge', async (req, res) => {
                         return;
                     }
                     // Do not allow VPN users to use a voucher
-                    if(voucherIsValid.valid) {
+                    if(blockVpn && voucherIsValid.valid) {
                         res.send({
                             status: 403,
                             message: `Please disable your VPN in order to use this coupon.`
@@ -679,6 +688,128 @@ app.post('/api/add', async (req, res) => {
         return;
     }
 });
+
+// Auth middleware
+const verifyToken = ((req, res, next) => {
+    const authHeader = req.headers['authorization'];
+
+    if (!authHeader || !authHeader.startsWith('Bearer ')) {
+        return res.status(401).json({ message: 'Authorization header missing or malformed' });
+    }
+
+    const token = authHeader.split(' ')[1];
+
+    try {
+        const decoded = jwt.verify(token, SECRET_KEY);
+        req.user = decoded; // attach user data to request
+        next();
+    } catch (err) {
+        return res.status(403).json({ message: 'Invalid or expired token' });
+    }
+});
+
+app.post('/api/login', async (req, res) => {
+    const { username, password } = req.body;
+
+    const dbUser = await User.findOne({where:{username: username}});
+
+    // 🔒 Replace this with real DB user validation
+    if (username === dbUser.username && password === dbUser.password) {
+        console.log(`Correct credentials!`);
+        const token = jwt.sign({ username }, SECRET_KEY, { expiresIn: '5m' });
+        return res.json({ token });
+    }
+  
+    res.status(401).json({ message: 'Invalid credentials' });
+});
+
+// Voucher routes
+app.get('/api/vouchers', verifyToken, async (req, res) => {
+    try {        
+        const vouchers = await Voucher.findAll({
+            attributes: {
+              include: [
+                [Sequelize.fn('COUNT', Sequelize.col('claims.id')), 'usageCount']
+              ]
+            },
+            include: [
+              {
+                model: Claim,
+                attributes: [], // Don't include full claim rows
+              }
+            ],
+            group: ['voucher.id'],
+            order: [['createdAt', 'DESC']]
+        });
+        res.json(vouchers);
+    }
+    catch(err) {
+        console.log(err);
+        res.status(500).json({            
+            message: 'Internal server error.'
+        });
+    }            
+});
+
+app.post('/api/vouchers/create', verifyToken, async (req, res) => {
+    const data = req.body;
+    
+    try {        
+        const user = await User.findOne({where: {username: data.user}});
+        await user.createVoucher({
+            code: data.code.toUpperCase(),            
+            payout: data.payout,
+            memo: data.memo,
+            max_supply: data.supply,
+        });
+
+        res.status(200).send();
+    }
+    catch(err) {
+        console.log(err)
+        return res.status(500).json({            
+            message: 'Internal server error.'
+        });
+    }            
+});
+
+app.delete('/api/vouchers/delete/:id', verifyToken, async (req, res) => {
+    const voucherId = req.params.id;
+    
+    try {
+        await Voucher.destroy({where: {id: voucherId}});
+        res.status(200).send();
+    }
+    catch(err) {
+        // console.log(err);
+        res.status(500).json({            
+            message: 'Internal server error.'
+        });
+    }            
+});
+
+app.put('/api/vouchers/update', verifyToken, async (req, res) => {    
+    const newValues = req.body;
+
+    try {
+        await Voucher.update(
+            {
+                payout: newValues.payout,
+                memo: newValues.memo,
+                max_supply: newValues.maxSupply
+            },
+            {where: {id: newValues.voucherId}
+        });
+        res.status(200).send();
+    }
+    catch(err) {
+        console.log(err);
+        res.status(500).json({            
+            message: 'Internal server error.'
+        });
+    }            
+});
+
 
 if(useHttps) {
     const options = {

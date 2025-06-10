@@ -36,92 +36,268 @@
 }
 
 .dashboard-section {
-    padding: 2rem;
-    background-color: #f0f0f0; /* Cor de fundo suave */
-    border-radius: 8px;
-    margin: 2rem auto;
-    max-width: 1000px; /* Limitar largura */
-    box-shadow: 0 4px 8px rgba(0, 0, 0, 0.1);
-  }
+  padding: 2rem;
+  background-color: #f0f0f0; /* Cor de fundo suave */
+  border-radius: 8px;
+  margin: 2rem auto;
+  max-width: 1000px; /* Limitar largura */
+  box-shadow: 0 4px 8px rgba(0, 0, 0, 0.1);
+}
+
+.dashboard-section h2 {
+  text-align: center;
+  color: #333;
+  margin-bottom: 1.5rem;
+  font-size: 1.8rem;
+}
+
+.metrics-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(180px, 1fr)); /* Grid responsivo */
+  gap: 1.5rem; /* Espaçamento entre os cartões */
+}
+
+.metric-card {
+  background-color: #ffffff;
+  padding: 1.5rem;
+  border-radius: 6px;
+  box-shadow: 0 2px 4px rgba(0, 0, 0, 0.05);
+  text-align: center;
+  transition: transform 0.2s ease-in-out;
+}
+
+.metric-card:hover {
+  transform: translateY(-5px); /* Efeito de hover */
+}
+
+.metric-card h4 {
+  margin: 0 0 0.5rem 0;
+  color: #555;
+  font-size: 1rem;
+  font-weight: 600;
+}
+
+.metric-card p {
+  margin: 0;
+  color: #222; /* Cor principal do Zcash (aproximada) */
+  font-size: 1.5rem;
+  font-weight: bold;
+}
   
-  .dashboard-section h2 {
-    text-align: center;
-    color: #333;
-    margin-bottom: 1.5rem;
-    font-size: 1.8rem;
+/* Ajustes para telas menores */
+@media (max-width: 600px) {
+  .dashboard-section {
+    padding: 1rem;
+    margin: 1rem;
   }
-  
+
   .metrics-grid {
-    display: grid;
-    grid-template-columns: repeat(auto-fit, minmax(180px, 1fr)); /* Grid responsivo */
-    gap: 1.5rem; /* Espaçamento entre os cartões */
+    grid-template-columns: 1fr; /* Uma coluna em telas pequenas */
+    gap: 1rem;
   }
-  
+
   .metric-card {
-    background-color: #ffffff;
-    padding: 1.5rem;
-    border-radius: 6px;
-    box-shadow: 0 2px 4px rgba(0, 0, 0, 0.05);
-    text-align: center;
-    transition: transform 0.2s ease-in-out;
+    padding: 1rem;
   }
-  
-  .metric-card:hover {
-    transform: translateY(-5px); /* Efeito de hover */
-  }
-  
-  .metric-card h4 {
-    margin: 0 0 0.5rem 0;
-    color: #555;
-    font-size: 1rem;
-    font-weight: 600;
-  }
-  
+
   .metric-card p {
-    margin: 0;
-    color: #222; /* Cor principal do Zcash (aproximada) */
-    font-size: 1.5rem;
-    font-weight: bold;
+    font-size: 1.3rem;
   }
+}
   
-  /* Ajustes para telas menores */
-  @media (max-width: 600px) {
-    .dashboard-section {
-      padding: 1rem;
-      margin: 1rem;
-    }
-  
-    .metrics-grid {
-      grid-template-columns: 1fr; /* Uma coluna em telas pequenas */
-      gap: 1rem;
-    }
-  
-    .metric-card {
-      padding: 1rem;
-    }
-  
-    .metric-card p {
-      font-size: 1.3rem;
-    }
-  }
-  
-  
-  
-  
-  .chart-container {
-    margin-top: 2rem;
-    background-color: #ffffff;
-    padding: 1.5rem;
-    border-radius: 6px;
-    box-shadow: 0 2px 4px rgba(0, 0, 0, 0.05);
-  }
-  
-  .chart-container h4 {
-    text-align: center;
-    margin: 0 0 1rem 0;
-    color: #555;
-    font-size: 1.2rem;
-    font-weight: 600;
-  }
-  
-  
+.chart-container {
+  margin-top: 2rem;
+  background-color: #ffffff;
+  padding: 1.5rem;
+  border-radius: 6px;
+  box-shadow: 0 2px 4px rgba(0, 0, 0, 0.05);
+}
+
+.chart-container h4 {
+  text-align: center;
+  margin: 0 0 1rem 0;
+  color: #555;
+  font-size: 1.2rem;
+  font-weight: 600;
+}
+
+.voucher-list {
+  display: flex;
+  flex-direction: column;
+  gap: 1.2rem;
+  margin-top: 8px;
+}
+
+.voucher-item {
+  background-color: white;
+  padding: 1rem;
+  border: 1px solid #ccc;
+  border-radius: 1rem;
+}
+
+.voucher-item.expanded {
+  flex-direction: column;
+  align-items: stretch;
+}
+
+.voucher-expanded {
+  margin-top: 10px;
+  padding-top: 10px;
+  border-top: 1px dashed #aaa;
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+.voucher-meta p {
+  margin: 0;
+  font-size: 0.85rem;
+  color: #444;
+}
+
+.voucher-edit label {
+  display: block;
+  font-size: 0.9rem;
+  margin-bottom: 5px;
+}
+
+.voucher-edit input, textarea {
+  width: 100%;
+  height: 32px;
+  padding: 6px;
+  font-size: 1rem;
+  margin-top: 2px;
+  border: 1px solid #ccc;
+  border-radius: 4px;
+}
+
+.voucher-actions {
+  display: flex;
+  justify-content: flex-end;
+  gap: 10px;
+}
+
+.btn-cancel,
+.btn-save {
+  padding: 6px 12px;
+  border: none;
+  border-radius: 5px;
+  font-size: 0.9rem;
+  cursor: pointer;
+}
+
+.btn-cancel {
+  background-color: #ccc;
+  color: #333;
+}
+
+.btn-save {
+  background-color: #4caf50;
+  color: white;
+}
+
+.btn-cancel:hover {
+  background-color: #b0b0b0;
+}
+
+.btn-save:hover {
+  background-color: #3e9140;
+}
+
+.new-coupon-widget {
+  border: 1px solid #ccc;
+  padding: 1rem;
+  border-radius: 8px;
+  /* max-width: 400px; */
+  background-color: #f9f9f9;
+  font-family: sans-serif;
+  margin-bottom: 8px;
+}
+
+.new-coupon-widget input,
+.new-coupon-widget textarea {
+  width: 100%;
+  padding: 0.5rem;
+  margin-top: 0.5rem;
+  margin-bottom: 1rem;
+  border-radius: 4px;
+  border: 1px solid #bbb;
+  box-sizing: border-box;
+}
+
+.new-coupon-widget textarea {
+  resize: vertical;
+  min-height: 80px;
+}
+
+.coupon-actions {
+  display: flex;
+  justify-content: space-between;
+}
+
+.cancel-btn,
+.create-btn {
+  padding: 0.5rem 1rem;
+  border: none;
+  border-radius: 6px;
+  cursor: pointer;
+}
+
+.cancel-btn {
+  background-color: #ccc;
+  color: #333;
+}
+
+.create-btn {
+  background-color: #f4b400;
+  color: #000;
+  font-weight: bold;
+}
+
+
+.login-container {
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  min-height: 100vh;
+  background-color: #f9f9f9;
+}
+
+.login-box {
+  background: white;
+  padding: 2rem 3rem;
+  border-radius: 10px;
+  box-shadow: 0 0 15px rgba(0, 0, 0, 0.1);
+  width: 100%;
+  max-width: 400px;
+  text-align: center;
+}
+
+.login-box h2 {
+  margin-bottom: 1.5rem;
+  color: #333;
+}
+
+.login-input {
+  width: 100%;
+  padding: 0.75rem 1rem;
+  margin-bottom: 1rem;
+  font-size: 1rem;
+  border: 1px solid #ccc;
+  border-radius: 8px;
+}
+
+.login-button {
+  width: 100%;
+  padding: 0.75rem;
+  font-size: 1rem;
+  background-color: #f4b728;
+  color: white;
+  border: none;
+  border-radius: 8px;
+  cursor: pointer;
+}
+
+.login-button:hover {
+  background-color: #d9a620;
+}

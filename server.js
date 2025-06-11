@@ -9,7 +9,6 @@ const axios = require('axios');
 const crypto = require('crypto');
 
 const jwt = require('jsonwebtoken');
-const SECRET_KEY = 'your-secret-key'; // Store securely in .env
 
 const https = require('https');
 const fs = require('fs');
@@ -26,6 +25,7 @@ const blockVpn = process.env.BLOCK_VPN === "true";
 
 const reCaptchaKey = process.env.RECAPTCHA_SECRET_KEY;
 const useRecaptcha = process.env.USE_RECAPTCHA === "true";
+const SECRET_KEY = process.env.JWT_SECRET_KEY; // Store securely in .env
 
 const LiteWallet = require('./zingolib-wrapper/zingolib');
 const { TxBuilder } = require('./zingolib-wrapper/utils/utils');
@@ -46,7 +46,7 @@ const memo = `Thanks for using ${network == 'test' ? 'testnet.' : ''}ZecFaucet.c
 
 // Queue for the faucet payout
 const waitTime = 90; // Time in minuts before next claim
-const payInterval = 3; // Time in minuts between payments
+const payInterval = 4; // Time in minuts between payments
 
 app.use(bodyParser.urlencoded({ extended: true }));
 app.use(bodyParser.json()) // to convert the request into JSON
@@ -386,7 +386,7 @@ const checkValidVoucher = async (voucherCode) => {
                 }
             });
 
-            if (usageCount > voucher.max_supply) {
+            if (usageCount >= voucher.max_supply) {
                 return {
                     valid: false,
                     hint: "This coupom is no longer available."
@@ -716,7 +716,7 @@ app.post('/api/login', async (req, res) => {
     // 🔒 Replace this with real DB user validation
     if (username === dbUser.username && password === dbUser.password) {
         console.log(`Correct credentials!`);
-        const token = jwt.sign({ username }, SECRET_KEY, { expiresIn: '5m' });
+        const token = jwt.sign({ username }, SECRET_KEY, { expiresIn: '3h' });
         return res.json({ token });
     }
   

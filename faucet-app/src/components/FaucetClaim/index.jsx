@@ -25,10 +25,10 @@ export default function FaucetClaim( { applyVoucher } ) {
   const { pathname } = useLocation();
   
   useEffect(() => {
-    if(pathname === '/test') {
+    // if(pathname === '/test') {
       console.log('Enabling voucher...')
       setEnableVoucher(true);
-    }
+    // }
 
     setCanClick(true);
   },[]);
@@ -80,6 +80,8 @@ export default function FaucetClaim( { applyVoucher } ) {
 
   const handleSuccess = ({ nonce, hash }) => {
     setModalVisible(false);
+    setVoucher('');
+    applyVoucher('');
     setCanClick(true);
 
     const token = {

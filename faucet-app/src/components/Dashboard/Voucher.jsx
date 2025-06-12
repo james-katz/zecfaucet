@@ -51,15 +51,18 @@ export default function Voucher({ setLogin }) {
       return toast.error("Please inform a coupon supply!")
     }
 
+    const token = localStorage.getItem('authToken');
+    const userId = localStorage.getItem('userId');
+
     const newVoucher = {
-      user: 'zcash', //TODO: implement login
+      user: userId, //TODO: implement login
       code: newVoucherCode,
       payout: newVoucherAmount,
       memo: newVoucherMemo,
       supply: newVoucherSupply
     }
 
-    const token = localStorage.getItem('authToken');
+    
 
     httpCommon.post('/vouchers/create', newVoucher, {headers: {
       Authorization: `Bearer ${token}`
@@ -83,7 +86,7 @@ export default function Voucher({ setLogin }) {
       Authorization: `Bearer ${token}`
     }}).then((res) => {
       setVoucherList(res.data);
-      console.log(res.data)
+      // console.log(res.data)
     }).catch(err => {
       localStorage.setItem('authToken', '');
       setLogin(false);
@@ -183,7 +186,7 @@ export default function Voucher({ setLogin }) {
             memo={voucher.memo}
             totalSupply={voucher.max_supply}
             usageCount={voucher.usageCount}
-            creatorName="Zcash Brasil"
+            creatorName={voucher.user.username}
             onSave={handleUpdateVoucher}
             onDelete={handleDeleteVoucher}
           />

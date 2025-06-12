@@ -63,7 +63,22 @@ async function migrate_db() {
         await User.create({
             username: seedUser,
             password: seedPwd
-        })
+        });
+
+        await User.create({
+            username: 'zechub',
+            password: seedPwd
+        });
+
+        await User.create({
+            username: 'zkavclub',
+            password: seedPwd
+        });
+
+        await User.create({
+            username: 'ecc',
+            password: seedPwd
+        });
 
         console.log("Done!");
         process.exit();

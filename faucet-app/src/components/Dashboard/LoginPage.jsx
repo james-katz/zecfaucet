@@ -11,8 +11,9 @@ export default function LoginPage( {onLogin} ) {
         e.preventDefault();
           
         httpCommon.post('/login', { username, password }).then((res) => {
-            const token = res.data.token;
+            const {username, userId, token } = res.data;
             localStorage.setItem('authToken', token);
+            localStorage.setItem('userId', userId);
             onLogin(); // update parent state
         }).catch (err => {
             console.log(err); 

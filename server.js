@@ -701,7 +701,7 @@ const verifyToken = ((req, res, next) => {
 
     try {
         const decoded = jwt.verify(token, SECRET_KEY);
-        req.user = decoded; // attach user data to request
+        req.user = decoded; // attach user data to request        
         next();
     } catch (err) {
         return res.status(403).json({ message: 'Invalid or expired token' });
@@ -716,8 +716,12 @@ app.post('/api/login', async (req, res) => {
     // 🔒 Replace this with real DB user validation
     if (username === dbUser.username && password === dbUser.password) {
         console.log(`Correct credentials!`);
-        const token = jwt.sign({ username }, SECRET_KEY, { expiresIn: '3h' });
-        return res.json({ token });
+        const token = jwt.sign({ userId: dbUser.id }, SECRET_KEY, { expiresIn: '3h' });
+        return res.json({ 
+            username: dbUser.username,
+            userId: dbUser.id,
+            token: token 
+        });
     }
   
     res.status(401).json({ message: 'Invalid credentials' });
@@ -735,16 +739,23 @@ app.get('/api/vouchers', verifyToken, async (req, res) => {
             include: [
               {
                 model: Claim,
-                attributes: [], // Don't include full claim rows
+                attributes: [], // Just for counting usage
+              },
+              {
+                model: User,
+                attributes: ['username'] // or whatever field you want from the User
               }
             ],
-            group: ['voucher.id'],
+            group: ['voucher.id', 'user.id'], // Important: group by both voucher and user
             order: [['createdAt', 'DESC']]
         });
+        if(req.user.userId > 1) {
+            return res.json(vouchers.filter((v) => v.userId === req.user.userId ));
+        }
         res.json(vouchers);
     }
     catch(err) {
-        console.log(err);
+        // console.log(err);
         res.status(500).json({            
             message: 'Internal server error.'
         });
@@ -755,7 +766,7 @@ app.post('/api/vouchers/create', verifyToken, async (req, res) => {
     const data = req.body;
     
     try {        
-        const user = await User.findOne({where: {username: data.user}});
+        const user = await User.findOne({where: {id: req.user.userId}});
         await user.createVoucher({
             code: data.code.toUpperCase(),            
             payout: data.payout,
@@ -766,7 +777,7 @@ app.post('/api/vouchers/create', verifyToken, async (req, res) => {
         res.status(200).send();
     }
     catch(err) {
-        console.log(err)
+        // console.log(err)
         return res.status(500).json({            
             message: 'Internal server error.'
         });
@@ -803,7 +814,7 @@ app.put('/api/vouchers/update', verifyToken, async (req, res) => {
         res.status(200).send();
     }
     catch(err) {
-        console.log(err);
+        // console.log(err);
         res.status(500).json({            
             message: 'Internal server error.'
         });

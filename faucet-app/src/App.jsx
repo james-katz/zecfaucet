@@ -7,7 +7,7 @@ export default function App() {
   const [faucetOffline, setFaucetOffline] = useState(false);
   const [coinName, setCoinName] = useState('');
 
-  useEffect(() => {
+  useEffect(() => {    
     httpCommon.get('/network').then((res) => {
       if(res.status === 200) {
         setCoinName(res.data.net === "test" ? "TAZ" : "ZEC");

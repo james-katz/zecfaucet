@@ -82,6 +82,7 @@ export default function FaucetClaim( { applyVoucher } ) {
     setModalVisible(false);
     setVoucher('');
     applyVoucher('');
+    setUserAddress('');
     setCanClick(true);
 
     const token = {

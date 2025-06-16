@@ -45,8 +45,8 @@ const t_payout = network == "main" ? 0.0003 : 0.1;
 const memo = `Thanks for using ${network == 'test' ? 'testnet.' : ''}ZecFaucet.com`;
 
 // Queue for the faucet payout
-const waitTime = 90; // Time in minuts before next claim
-const payInterval = 4; // Time in minuts between payments
+const waitTime = network == "main" ? 90 : 15; // Time in minuts before next claim
+const payInterval = 3; // Time in minuts between payments
 
 app.use(bodyParser.urlencoded({ extended: true }));
 app.use(bodyParser.json()) // to convert the request into JSON
@@ -143,7 +143,7 @@ zingo.init().then(async () => {
         if(sendProgress) return;
         
         const lastDbTxid = await Transaction.findAll({
-            // where: { kind: 'received' },
+            where: { kind: 'received' },
             order: [['createdAt', 'DESC']],
             limit: 1
         });
@@ -151,8 +151,8 @@ zingo.init().then(async () => {
         const lastTxid = zingo.fetchLastTxId();
 
         if(lastTxid && lastDbTxid[0] && lastDbTxid[0].txid && lastDbTxid[0].txid != lastTxid) {                   
-            const txSummaries = await zingo.getTransactionsSummaries();                        
-            const walletTxns = txSummaries.transaction_summaries.reverse();
+            const txSummaries = await zingo.getTransactions(20); // Look only latest n transactions
+            const walletTxns = txSummaries.value_transfers;
             let count = 0;
             for(const tx of walletTxns) {
                 if(tx.txid == lastDbTxid[0].txid) {
@@ -165,12 +165,13 @@ zingo.init().then(async () => {
                         const txTimestamp = new Date(tx.datetime * 1000);
 
                         let txMemo = "No memo available";
-                        if(tx.orchard_notes[0] && tx.orchard_notes[0].memo != null) {
-                            txMemo = tx.orchard_notes[0].memo;
-                        }
-                        else if(tx.sapling_notes[0] && tx.sapling_notes[0].memo != null) {
-                            txMemo = tx.sapling_notes[0].memo;
-                        }
+                        // if(tx.orchard_notes[0] && tx.orchard_notes[0].memo != null) {
+                        //     txMemo = tx.orchard_notes[0].memo;
+                        // }
+                        // else if(tx.sapling_notes[0] && tx.sapling_notes[0].memo != null) {
+                        //     txMemo = tx.sapling_notes[0].memo;
+                        // }
+                        if(tx.memos && tx.memos.length > 0 ) txMemo = tx.memos[0];
 
                         await Transaction.create({
                             txid: tx.txid,
@@ -182,7 +183,7 @@ zingo.init().then(async () => {
                         console.log(`New donation of ${tx.value / 10**8} received!\nMessage: ${txMemo}`);
                     }
                     catch {
-                        // console.log("Couldn't insert donation into db ...");
+                        console.log("Couldn't insert donation into db ...");
                     }
                     count += 1;
                 }
@@ -713,7 +714,6 @@ app.post('/api/login', async (req, res) => {
 
     const dbUser = await User.findOne({where:{username: username}});
 
-    // 🔒 Replace this with real DB user validation
     if (username === dbUser.username && password === dbUser.password) {
         console.log(`Correct credentials!`);
         const token = jwt.sign({ userId: dbUser.id }, SECRET_KEY, { expiresIn: '3h' });

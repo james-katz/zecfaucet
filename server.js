@@ -654,7 +654,7 @@ app.post('/api/add', async (req, res) => {
     
     const userCanClaim = await canClaim(userAddr, userIp);
     if(!userCanClaim.allowed) {
-        console.log9("Double claim blocked!");
+        console.log("Double claim blocked!");
         return res.send({
             status: 403,
             message: `Please wait ${userCanClaim.remaining} minutes before claiming again.`

@@ -21,6 +21,7 @@ const lwd_url = process.env.LWD_URL;
 const network = process.env.NETWORK;
 
 const useHttps = process.env.USE_HTTPS === "true";
+const checkVpn = process.env.CHECK_VPN === "true";
 const blockVpn = process.env.BLOCK_VPN === "true";
 
 const reCaptchaKey = process.env.RECAPTCHA_SECRET_KEY;
@@ -47,6 +48,7 @@ const memo = `Thanks for using ${network == 'test' ? 'testnet.' : ''}ZecFaucet.c
 // Queue for the faucet payout
 const waitTime = network == "main" ? 90 : 15; // Time in minuts before next claim
 const payInterval = 3; // Time in minuts between payments
+const scanInterval = 30; // Time in minuts to scan donations
 
 app.use(bodyParser.urlencoded({ extended: true }));
 app.use(bodyParser.json()) // to convert the request into JSON
@@ -165,12 +167,7 @@ zingo.init().then(async () => {
                         const txTimestamp = new Date(tx.datetime * 1000);
 
                         let txMemo = "No memo available";
-                        // if(tx.orchard_notes[0] && tx.orchard_notes[0].memo != null) {
-                        //     txMemo = tx.orchard_notes[0].memo;
-                        // }
-                        // else if(tx.sapling_notes[0] && tx.sapling_notes[0].memo != null) {
-                        //     txMemo = tx.sapling_notes[0].memo;
-                        // }
+                        
                         if(tx.memos && tx.memos.length > 0 ) txMemo = tx.memos[0];
 
                         await Transaction.create({
@@ -192,7 +189,7 @@ zingo.init().then(async () => {
         else {
             console.log("No new donation");           
         }
-    }, payInterval * 1.5 * 60 * 1000);
+    }, scanInterval * 60 * 1000);
 }).catch((err) => { console.log(err) });
 
 function getClientIp(req) {
@@ -497,7 +494,7 @@ app.post('/api/challenge', async (req, res) => {
         if (userCanClaim.allowed) {
             // Check if user is using proxy/vpn,            
             try {        
-                const ipAddress = userIp.match(/(\d{1,3}\.\d{1,3}\.\d{1,3}\.\d{1,3})$/)[0];             
+                const ipAddress = userIp.match(/(\d{1,3}\.\d{1,3}\.\d{1,3}\.\d{1,3})$/)[0];
                 
                 // Buf first of all, check reCaptcha v3 token
                 const params = new URLSearchParams();
@@ -526,30 +523,31 @@ app.post('/api/challenge', async (req, res) => {
                     });
                     return;
                 }
-                
-                const proxyOrVpn = await axios.get(`http://check.getipintel.net/check.php?ip=${ipAddress}&contact=james.j.katz@protonmail.com`);
-                if(proxyOrVpn.data > 0.90) {
-                    console.log("VPN/Proxy detected.");
-                    isVpn = true;
-                    if(blockVpn) {                        
-                        res.send({
-                            status: 403,
-                            message: `Sorry, we couldn't verify you're not a robot.`
-                        });
-                        return;
+
+                if(checkVpn) {
+                    const proxyOrVpn = await axios.get(`http://check.getipintel.net/check.php?ip=${ipAddress}&contact=james.j.katz@protonmail.com`);
+                    if(proxyOrVpn && proxyOrVpn.data > 0.90) {
+                        console.log("VPN/Proxy detected.");
+                        
+                        if(blockVpn && voucherIsValid.valid) {
+                            return res.send({
+                                status: 403,
+                                message: `Please disable your VPN in order to use this coupon.`
+                            });
+                        }
+                                                
+                        if(blockVpn) {
+                            return res.send({
+                                status: 403,
+                                message: `Sorry, we couldn't verify you're not a robot.`
+                            });
+                        }
+                        isVpn = true;
                     }
-                    // Do not allow VPN users to use a voucher
-                    if(blockVpn && voucherIsValid.valid) {
-                        res.send({
-                            status: 403,
-                            message: `Please disable your VPN in order to use this coupon.`
-                        });
-                        return;
-                    }     
-                }                
+                }              
             }
-            catch(err) {
-                console.log("Couldn't check user ip for proxy or vpn.");
+            catch(err) {                
+                console.log("Couldn't check user reCaptcha score or ip for proxy or vpn.");
             }
 
             // Then check if faucet has enough balance
@@ -654,6 +652,15 @@ app.post('/api/add', async (req, res) => {
     const tokenIsValid = await checkValidPoW(token, userIp);
     const voucherIsValid = await checkValidVoucher(token.voucher);
     
+    const userCanClaim = await canClaim(userAddr, userIp);
+    if(!userCanClaim.allowed) {
+        console.log9("Double claim blocked!");
+        return res.send({
+            status: 403,
+            message: `Please wait ${userCanClaim.remaining} minutes before claiming again.`
+        });
+    }
+
     if(tokenIsValid && userIp) {                        
         if(voucherIsValid.valid) {
             console.log(`Using voucher ${voucherIsValid.voucher.code}`);

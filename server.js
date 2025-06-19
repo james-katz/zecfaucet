@@ -344,12 +344,28 @@ app.get('/api/voucher', async (req, res) => {
 const canClaim = async (address, ip) => {
     // Check if user awaited `waitTime` (even if user is still in the queue)
     const cutoffTime = new Date(Date.now() - waitTime * 60 * 1000);
-  
+    
+    let sequentialIp = '';
+    const parts = ip.split('.');
+    if (parts.length < 4) {
+        sequentialIp = ip; // fallback, return original IP if unexpected format
+    }
+    const prefix = parts.slice(0, 2).join('.');
+
+    sequentialIp = ip.includes('::ffff:')
+        ? `::ffff:${prefix}.%`
+        : `${prefix}.%`;
+
     const recentClaim = await Claim.findOne({
         where: {
             [Op.or]: [
                 { address },
-                { ip }
+                { ip },
+                {
+                  ip: {
+                    [Op.like]: sequentialIp
+                  }
+                }
             ],
             createdAt: {
             [Op.gte]: cutoffTime

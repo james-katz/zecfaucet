@@ -24,6 +24,8 @@ const useHttps = process.env.USE_HTTPS === "true";
 const checkVpn = process.env.CHECK_VPN === "true";
 const blockVpn = process.env.BLOCK_VPN === "true";
 
+const faucetClosed = process.env.FAUCET_CLOSED === "true";
+
 const reCaptchaKey = process.env.RECAPTCHA_SECRET_KEY;
 const useRecaptcha = process.env.USE_RECAPTCHA === "true";
 const SECRET_KEY = process.env.JWT_SECRET_KEY; // Store securely in .env
@@ -47,11 +49,11 @@ const memo = `Thanks for using ${network == 'test' ? 'testnet.' : ''}ZecFaucet.c
 
 // Queue for the faucet payout
 const waitTime = network == "main" ? 120 : 15; // Time in minuts before next claim
-const payInterval = 4; // Time in minuts between payments
+const payInterval = 3; // Time in minuts between payments
 const minBlocks = 2; // Number of blocks to wait before sending payments
 const scanInterval = 45; // Time in minutes to scan donations
 
-let walletHeight = 0;
+let latestHeight = 0;
 
 app.use(bodyParser.urlencoded({ extended: true }));
 app.use(bodyParser.json()) // to convert the request into JSON
@@ -74,16 +76,22 @@ zingo.init().then(async () => {
     //initialize the database
     await initializeDatabase();
 
-    walletHeight = client.lastWalletBlockHeight;
+    latestHeight = zingo.lastWalletBlockHeight;
 
     // Send payments every 3 minutes
     const timerID = setInterval(async() => {
-        const currentHeight = client.lastWalletBlockHeight;
-        const elapsedBlocks = currentHeight - walletHeight;
+        const currentHeight = zingo.lastWalletBlockHeight;
+        const elapsedBlocks = currentHeight - latestHeight;
+        console.log("old height", latestHeight)
+        console.log("current height", currentHeight)
+        console.log("elapsed", elapsedBlocks)
+        
         if(elapsedBlocks < minBlocks) {
-            console.log(`Awaiting ${minBlocks - elapsedBlocks} before sending payments ...`);
+            console.log(`Awaiting ${minBlocks - elapsedBlocks} more blocks before sending payments ...`);
             return;
         }
+
+        latestHeight = currentHeight;
 
         const sendProgress = zingo.isSending;
         const notes = await zingo.fetchNotes();
@@ -511,6 +519,15 @@ app.post('/api/challenge', async (req, res) => {
     const reCaptchaToken = req.body.token;
     const voucherIsValid = await checkValidVoucher(req.body.voucher);
     
+    // CHeck if faucet is closed for voucher holderd
+    if(faucetClosed && !voucherIsValid.valid) {
+        console.log("User without a voucher.");
+        res.send({
+            status: 403,
+            message: `The faucet is temporarily restricted to coupon holders. Come back soon!`
+        });
+    }
+
     const userIp = getClientIp(req);    
     let isVpn = false;
     let reScore = 1.0;
@@ -535,20 +552,18 @@ app.post('/api/challenge', async (req, res) => {
                     // console.log(captcha.data)
                     if (useRecaptcha && reScore <= 0.3) {
                         console.log(`User blocked due to low score.`);
-                        res.send({
+                        return res.send({
                             status: 403,
                             message: `Sorry, we couldn't verify you're not a robot.`
-                        });
-                        return;
+                        });                        
                     }
                 }
                 else {
                     console.log(`User blocked due to invalid captcha.`);
-                    res.send({
+                    return res.send({
                         status: 403,
                         message: `Sorry, we couldn't verify you're not a robot.`
-                    });
-                    return;
+                    });                    
                 }
 
                 if(checkVpn) {
@@ -556,12 +571,12 @@ app.post('/api/challenge', async (req, res) => {
                     if(proxyOrVpn && proxyOrVpn.data > 0.90) {
                         console.log("VPN/Proxy detected.");
                         
-                        if(blockVpn && voucherIsValid.valid) {
-                            return res.send({
-                                status: 403,
-                                message: `Please disable your VPN in order to use this coupon.`
-                            });
-                        }
+                        // if(blockVpn && voucherIsValid.valid) {
+                        //     return res.send({
+                        //         status: 403,
+                        //         message: `Please disable your VPN in order to use this coupon.`
+                        //     });
+                        // }
                                                 
                         if(blockVpn) {
                             return res.send({

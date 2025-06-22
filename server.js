@@ -46,9 +46,12 @@ const t_payout = network == "main" ? 0.0003 : 0.1;
 const memo = `Thanks for using ${network == 'test' ? 'testnet.' : ''}ZecFaucet.com`;
 
 // Queue for the faucet payout
-const waitTime = network == "main" ? 90 : 15; // Time in minuts before next claim
-const payInterval = 3; // Time in minuts between payments
-const scanInterval = 30; // Time in minuts to scan donations
+const waitTime = network == "main" ? 120 : 15; // Time in minuts before next claim
+const payInterval = 4; // Time in minuts between payments
+const minBlocks = 2; // Number of blocks to wait before sending payments
+const scanInterval = 45; // Time in minutes to scan donations
+
+let walletHeight = 0;
 
 app.use(bodyParser.urlencoded({ extended: true }));
 app.use(bodyParser.json()) // to convert the request into JSON
@@ -71,9 +74,17 @@ zingo.init().then(async () => {
     //initialize the database
     await initializeDatabase();
 
+    walletHeight = client.lastWalletBlockHeight;
+
     // Send payments every 3 minutes
     const timerID = setInterval(async() => {
-        
+        const currentHeight = client.lastWalletBlockHeight;
+        const elapsedBlocks = currentHeight - walletHeight;
+        if(elapsedBlocks < minBlocks) {
+            console.log(`Awaiting ${minBlocks - elapsedBlocks} before sending payments ...`);
+            return;
+        }
+
         const sendProgress = zingo.isSending;
         const notes = await zingo.fetchNotes();
         let pending = notes.pending_orchard_notes.length > 0 || notes.pending_sapling_notes.length > 0 || notes.pending_utxos.length > 0;        
@@ -352,9 +363,7 @@ const canClaim = async (address, ip) => {
     }
     const prefix = parts.slice(0, 2).join('.');
 
-    sequentialIp = ip.includes('::ffff:')
-        ? `::ffff:${prefix}.%`
-        : `${prefix}.%`;
+    sequentialIp = `${prefix}.%`;
 
     const recentClaim = await Claim.findOne({
         where: {
@@ -384,6 +393,8 @@ const canClaim = async (address, ip) => {
     const elapsedMinutes = elapsedMs / 60000;
     const remainingMinutes = Math.ceil(waitTime - elapsedMinutes);
   
+    console.log(`greedy user`);
+
     return {
         allowed: false,
         remaining: remainingMinutes
@@ -603,7 +614,7 @@ app.post('/api/challenge', async (req, res) => {
                 let baseDiff = Math.min(15, base + Math.floor(claimsPerHour / 8));
 
                 const reScoreCapped = Math.max(0.3, Math.min(1.0, reScore));
-                baseDiff += Math.round(((1.0 - reScoreCapped) / 0.7) * 3);
+                // baseDiff += Math.round(((1.0 - reScoreCapped) / 0.7) * 3);
                 
                 // Get the total user claims (wallet address or IP)
                 let userClaimCount = await Claim.count({

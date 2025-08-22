@@ -1,4 +1,4 @@
-const { Transaction, User, resetDatabase } = require('./sequelize');
+const { Transaction, User, Voucher, initializeDatabase, resetDatabase } = require('./sequelize');
 const LiteWallet = require('./zingolib-wrapper/zingolib');
 
 const dotenv = require('dotenv');
@@ -6,6 +6,11 @@ dotenv.config();
 
 async function migrate_db() {
     console.log("Migrating db");
+    
+    await initializeDatabase();
+    // Save existing vouchers
+    const vouchers = await Voucher.findAll({ raw: true });
+    
     await resetDatabase();
 
     const seedUser = process.env.SEED_USERNAME;
@@ -18,8 +23,8 @@ async function migrate_db() {
     const zingo = new LiteWallet(lwd_url, network, false);
     zingo.init().then(async () => {    
         // fetch all transactions
-        const txList = zingo.getTransactionsSummaries();  
-        const allTx = txList.transaction_summaries;
+        const txList = await zingo.getTransactions();  
+        const allTx = txList.value_transfers;
 
         console.log(`Processing a total of ${allTx.length} transactions.`)
 
@@ -30,13 +35,8 @@ async function migrate_db() {
             const txValue = tx.value;
             const txFee = tx.fee;
 
-            let txMemo = "No memo available";
-            if(tx.orchard_notes[0] && tx.orchard_notes[0].memo != null) {
-                txMemo = tx.orchard_notes[0].memo;
-            }
-            else if(tx.sapling_notes[0] && tx.sapling_notes[0].memo != null) {
-                txMemo = tx.sapling_notes[0].memo;
-            }
+            let txMemo = "No memo available";                            
+            if(tx.memos && tx.memos.length > 0) txMemo = tx.memos[0];
 
             const txDb = await Transaction.create({
                 txid: txTxid,
@@ -48,15 +48,15 @@ async function migrate_db() {
             });
             
             if(txKind == "sent") {
-                const txClaims = tx.outgoing_tx_data;
-                for(const claim of txClaims) {
+                // const txClaims = tx.outgoing_tx_data;
+                // for(const claim of txClaims) {
                     await txDb.createClaim({
-                        address: claim.address,
+                        address: tx.recipient_address,
                         ip: '0.0.0.0',
                         pending: false,
                         createdAt: txTimestamp
                     });
-                }
+                // }
             }
         }
 
@@ -79,6 +79,19 @@ async function migrate_db() {
             username: 'ecc',
             password: seedPwd
         });
+
+        // Re-insert vouchers
+        for (const v of vouchers) {
+            await Voucher.create({
+                code: v.code,
+                payout: v.payout,
+                memo: v.memo,
+                max_supply: v.max_supply,
+                userId: v.userId,
+                createdAt: v.createdAt,
+                updatedAt: v.updatedAt
+            });
+        }
 
         console.log("Done!");
         process.exit();

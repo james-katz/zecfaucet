@@ -50,8 +50,8 @@ const memo = `Thanks for using ${network == 'test' ? 'testnet.' : ''}ZecFaucet.c
 // Queue for the faucet payout
 const waitTime = network == "main" ? 120 : 15; // Time in minuts before next claim
 const payInterval = 3; // Time in minuts between payments
-const minBlocks = 2; // Number of blocks to wait before sending payments
-const scanInterval = 45; // Time in minutes to scan donations
+const minBlocks = 3; // Number of blocks to wait before sending payments
+const scanInterval = 5; // Time in minutes to scan donations
 
 let latestHeight = 0;
 
@@ -61,7 +61,7 @@ app.use(cors()) // to allow cross origin requests
 app.set("trust proxy", true);
 
 // Setup zingolib
-const zingo = new LiteWallet(lwd_url, network, false);
+const zingo = new LiteWallet(lwd_url, network);
 
 const fakeSendTransaction = (foo) => {
     return new Promise((resolve, reject) => {
@@ -78,7 +78,7 @@ zingo.init().then(async () => {
 
     latestHeight = zingo.lastWalletBlockHeight;
 
-    // Send payments every 3 minutes
+    // Send payments every `payInterval` minutes
     const timerID = setInterval(async() => {
         const currentHeight = zingo.lastWalletBlockHeight;
         const elapsedBlocks = currentHeight - latestHeight;
@@ -93,9 +93,7 @@ zingo.init().then(async () => {
 
         latestHeight = currentHeight;
 
-        const sendProgress = zingo.isSending;
-        const notes = await zingo.fetchNotes();
-        let pending = notes.pending_orchard_notes.length > 0 || notes.pending_sapling_notes.length > 0 || notes.pending_utxos.length > 0;        
+        const sendProgress = zingo.isSending;        
 
         const queue = await Claim.findAll({
             where: {
@@ -103,8 +101,8 @@ zingo.init().then(async () => {
             }
         });
         
-        console.log(`Queue: ${queue.length} | Sending: ${sendProgress} | Pending: ${pending}`);
-        if(queue.length > 0 && !sendProgress && !pending) {
+        console.log(`Queue: ${queue.length} | Sending: ${sendProgress} | Synclock: ${zingo.syncLock}`);
+        if(queue.length > 0 && !sendProgress && !zingo.syncLock) {
             const sendJson = (
                 await Promise.all(queue.map(async (q) => {
                     let sendAmount = u_payout;
@@ -125,11 +123,13 @@ zingo.init().then(async () => {
                 }))
             ).flat();
             // console.log(sendJson);
-            
-            zingo.sendTransaction(sendJson).then(async (txid)=>{
+            const sendJsonStr = JSON.stringify(sendJson);
+
+            zingo.sendTransaction(sendJsonStr).then(async (txid)=>{
             // fakeSendTransaction(sendJson).then(async (txid)=>{                               
-                const totalValue = sendJson.map((el) => el.amount).reduce((acc, curr) => acc + curr, 0);
+                console.log(txid);
                 
+                const totalValue = sendJson.map((el) => el.amount).reduce((acc, curr) => acc + curr, 0);
                 // console.log(totalValue)
                 try {
                     // add Transaction and claims to database
@@ -171,39 +171,44 @@ zingo.init().then(async () => {
 
         const lastTxid = zingo.fetchLastTxId();
 
-        if(lastTxid && lastDbTxid[0] && lastDbTxid[0].txid && lastDbTxid[0].txid != lastTxid) {                   
-            const txSummaries = await zingo.getTransactions(20); // Look only latest n transactions
-            const walletTxns = txSummaries.value_transfers;
-            let count = 0;
-            for(const tx of walletTxns) {
-                if(tx.txid == lastDbTxid[0].txid) {
-                    console.log(`Done looking for donations, received a total of ${count} donations.`);
-                    break;
-                }
+        // console.log("db txid:", lastDbTxid[0].txid);
+        // console.log("wallet txid:", lastTxid);
 
-                if(tx.kind == 'received') {
-                    try {
-                        const txTimestamp = new Date(tx.datetime * 1000);
-
-                        let txMemo = "No memo available";
-                        
-                        if(tx.memos && tx.memos.length > 0 ) txMemo = tx.memos[0];
-
-                        await Transaction.create({
-                            txid: tx.txid,
-                            kind: tx.kind,
-                            value: tx.value,                            
-                            memo: txMemo,
-                            createdAt: txTimestamp
-                        });
-                        console.log(`New donation of ${tx.value / 10**8} received!\nMessage: ${txMemo}`);
+        if(lastTxid && lastDbTxid[0] && lastDbTxid[0].txid && lastDbTxid[0].txid != lastTxid) {                               
+            console.log("Will start looking for new  donations ...")
+            zingo.getTransactionsPromise().then(async (txSummaries) => {
+                const walletTxns = txSummaries.value_transfers;
+                let count = 0;
+                for(const tx of walletTxns) {
+                    if(tx.txid == lastDbTxid[0].txid) {
+                        console.log(`Done looking for donations, received a total of ${count} donations.`);
+                        break;
                     }
-                    catch {
-                        console.log("Couldn't insert donation into db ...");
+                    
+                    if(tx.kind == 'received') {
+                        try {
+                            const txTimestamp = new Date(tx.datetime * 1000);
+
+                            let txMemo = "No memo available";
+                            
+                            if(tx.memos && tx.memos.length > 0) txMemo = tx.memos[0];
+
+                            await Transaction.create({
+                                txid: tx.txid,
+                                kind: tx.kind,
+                                value: tx.value,                            
+                                memo: txMemo,
+                                createdAt: txTimestamp
+                            });
+                            console.log(`New donation of ${tx.value / 10**8} received!\nMessage: ${txMemo}`);
+                        }
+                        catch(e) {
+                            console.log("Couldn't insert donation into db ...");
+                        }
+                        count ++;
                     }
-                    count += 1;
                 }
-            }
+            }).catch(e => { console.log(e) });
         }
         else {
             console.log("No new donation");           
@@ -241,13 +246,12 @@ app.get('/api/payout', async(req, res) =>{
 
 app.get('/api/donate', async (req, res) => {    
     const addr = await zingo.fetchAllAddresses();
-    res.send(addr[0].address);
+    res.send(addr[0].encoded_address);
 });
 
 app.get('/api/balance', async (req, res) => {    
-    zingo.fetchTotalBalance().then((bal) => {
-        res.send(`${bal.toFixed(8)}`);
-    });
+    const bal = zingo.fetchTotalSpendableBalance();
+    return res.send(`${bal.toFixed(8)}`);
 });
 
 app.get('/api/log', async (req, res) => {
@@ -272,7 +276,7 @@ app.get('/api/dashboard-stats', async (req, res) => {
         where: { kind: 'received' }
     });
 
-    const balance = await zingo.fetchTotalBalance();
+    const balance = zingo.fetchTotalSpendableBalance();
 
     const sevenDaysAgo = new Date(Date.now() - 7 * 24 * 60 * 60 * 1000);
 
@@ -532,8 +536,15 @@ app.post('/api/challenge', async (req, res) => {
     let isVpn = false;
     let reScore = 1.0;
 
-    const validAddr = await zingo.parseAddress(userAddr);
-    if(validAddr && validAddr.address_kind === 'unified' && validAddr.chain_name == network) {
+    const parsedAddr = await zingo.parseAddress(userAddr);
+    const validAddr = false;
+    if(network == "test") {
+        validAddr = parsedAddr && parsedAddr.chain_name == network;
+    }
+    else {
+        validAddr = parsedAddr && parsedAddr.chain_name == network && parsedAddr.address_kind == "unified";
+    }
+    if(validAddr) {
         const userCanClaim = await canClaim(userAddr, userIp);
         if (userCanClaim.allowed) {
             // Check if user is using proxy/vpn,            
@@ -594,16 +605,18 @@ app.post('/api/challenge', async (req, res) => {
 
             // Then check if faucet has enough balance
             // TODO: Move to a separete function
-            const bal = await zingo.fetchTotalBalance();
+            const bal = zingo.fetchTotalSpendableBalance();
             const queue = await Claim.findAll({
                 where: {
                     pending: true
                 }
             });
-            const fee = await zingo.getDefaultFee() * queue.length;
-            const queueSum = queue.map((el) => el.amount).reduce((acc, curr) => acc + curr, fee);
+            const queueSum = queue
+                .map((el) => Number(el.amount))
+                .reduce((acc, curr) => acc + curr, 0.00001);
+                
             const pay = voucherIsValid.valid ? voucherIsValid.voucher.payout : u_payout;
-            // console.log(`Faucet balance: ${bal}, Queue sum: ${queueSum}, adding ${pay} to the queue`);
+            console.log(`Faucet balance: ${bal}, Queue sum: ${queueSum}, adding ${pay} to the queue`);
 
             if((queueSum + pay) * 2 > bal) {
                 res.send({

@@ -250,7 +250,7 @@ app.get('/api/donate', async (req, res) => {
 });
 
 app.get('/api/balance', async (req, res) => {    
-    const bal = zingo.fetchTotalSpendableBalance();
+    const bal = zingo.fetchTotalSpendableBalance() / 10**8;
     return res.send(`${bal.toFixed(8)}`);
 });
 
@@ -537,7 +537,7 @@ app.post('/api/challenge', async (req, res) => {
     let reScore = 1.0;
 
     const parsedAddr = await zingo.parseAddress(userAddr);
-    const validAddr = false;
+    let validAddr = false;
     if(network == "test") {
         validAddr = parsedAddr && parsedAddr.chain_name == network;
     }
@@ -605,7 +605,9 @@ app.post('/api/challenge', async (req, res) => {
 
             // Then check if faucet has enough balance
             // TODO: Move to a separete function
-            const bal = zingo.fetchTotalSpendableBalance();
+            const bal = zingo.fetchTotalSpendableBalance() / 10**8;
+            // const bal = 1.3;
+            
             const queue = await Claim.findAll({
                 where: {
                     pending: true
@@ -615,15 +617,37 @@ app.post('/api/challenge', async (req, res) => {
                 .map((el) => Number(el.amount))
                 .reduce((acc, curr) => acc + curr, 0.00001);
                 
-            const pay = voucherIsValid.valid ? voucherIsValid.voucher.payout : u_payout;
-            console.log(`Faucet balance: ${bal}, Queue sum: ${queueSum}, adding ${pay} to the queue`);
+            const vouchers = await Voucher.findAll({ raw: true });
 
-            if((queueSum + pay) * 2 > bal) {
-                res.send({
+            let reservedBalance = 0;
+
+            for (const voucher of vouchers) {
+                const usedCount = await Claim.count({
+                    where: { voucherId: voucher.id }
+                });
+
+                const remaining = Math.max(0, voucher.max_supply - usedCount);
+                reservedBalance += remaining * voucher.payout;
+            }
+
+            const pay = voucherIsValid.valid ? voucherIsValid.voucher.payout : u_payout;
+            console.log(`Faucet balance: ${bal}, Reserved balance: ${reservedBalance}, Queue sum: ${queueSum}, trying to add ${pay} to the queue`);
+
+            const safeMargin = 0.005;
+            
+            if(!voucherIsValid.valid && bal - (queueSum + pay) < reservedBalance + safeMargin) {
+                console.log("Balance is reserved for couponns holders.")
+                return res.send({
+                    status: 503,
+                    message: `The faucet balance is reserved for coupon holders.`
+                });                
+            }
+
+            if(bal - safeMargin < queueSum + pay) {
+                return res.send({
                     status: 503,
                     message: `It looks like the faucet wallet don't have enough funds 🥹`
-                });
-                return;
+                });                
             }
             
             // If everything is ok, send the challenge to the user            

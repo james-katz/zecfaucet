@@ -646,16 +646,7 @@ app.post('/api/challenge', async (req, res) => {
                     pending: true
                 }
             });
-
-            // Global cooldown
-            if(!voucherIsValid.valid && queue.length > 20) {
-                console.log("Cooldown active");
-                return res.send({
-                    status: 503,
-                    message: `ZecFaucet is in cooldown mode due to high number of claims. Please try again later.`
-                });
-            }
-            
+      
             // TODO improve this
             const queueSum = queue.length * u_payout;                
                 
@@ -704,6 +695,16 @@ app.post('/api/challenge', async (req, res) => {
                     }
                 });
                 console.log(`Faucet claims/hour: ${claimsPerHour}`);
+                
+                // Global cooldown
+                if(!voucherIsValid.valid && claimsPerHour > 20) {
+                    console.log("Cooldown active");
+                    return res.send({
+                        status: 503,
+                        message: `ZecFaucet is in cooldown mode due to high number of claims. Please try again later.`
+                    });
+                }
+                
                 const base = isVpn ? 15 : 5;
                 let baseDiff = Math.min(15, base + Math.floor(claimsPerHour / 8));
 

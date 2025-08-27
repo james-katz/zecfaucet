@@ -634,20 +634,29 @@ app.post('/api/challenge', async (req, res) => {
             catch(err) {                
                 console.log("Couldn't check user reCaptcha score or ip for proxy or vpn.");
             }
-
+            
             // Then check if faucet has enough balance
             // TODO: Move to a separete function
             const bal = zingo.fetchTotalSpendableBalance() / 10**8;
             // const bal = 1.3;
+            const pay = voucherIsValid.valid ? voucherIsValid.voucher.payout : u_payout;
             
             const queue = await Claim.findAll({
                 where: {
                     pending: true
                 }
             });
-            const queueSum = queue
-                .map((el) => Number(el.amount))
-                .reduce((acc, curr) => acc + curr, 0.00001);
+
+            // Global cooldown
+            if(!voucherIsValid.valid && queue.length > 20) {
+                return res.send({
+                    status: 503,
+                    message: `ZecFaucet is in cooldown mode due to high number of claims. Please try again later.`
+                });
+            }
+            
+            // TODO improve this
+            const queueSum = queue.length * u_payout;                
                 
             const vouchers = await Voucher.findAll({ raw: true });
 
@@ -662,7 +671,7 @@ app.post('/api/challenge', async (req, res) => {
                 reservedBalance += remaining * voucher.payout;
             }
 
-            const pay = voucherIsValid.valid ? voucherIsValid.voucher.payout : u_payout;
+            
             console.log(`Faucet balance: ${bal}, Reserved balance: ${reservedBalance}, Queue sum: ${queueSum}, trying to add ${pay} to the queue`);
 
             const safeMargin = 0.005;

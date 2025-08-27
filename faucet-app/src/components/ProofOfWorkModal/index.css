@@ -12,15 +12,16 @@
 }
   
 .pow-modal {
-    background: #fff;
-    padding: 2rem;
-    border-radius: 10px;
-    max-width: 500px;
-    width: 90%;
-    text-align: center;
-    box-shadow: 0 4px 20px rgba(0, 0, 0, 0.3);
+  /* overflow: visible; */
+  background: #fff;
+  padding: 2rem;
+  border-radius: 10px;
+  max-width: 500px;
+  width: 90%;
+  text-align: center;
+  box-shadow: 0 4px 20px rgba(0,0,0,.3);
 }
-  
+
 .pow-text {
     font-size: 1rem;
     color: #444;

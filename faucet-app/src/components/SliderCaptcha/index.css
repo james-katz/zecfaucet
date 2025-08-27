@@ -1,0 +1,6 @@
+.captcha-wrap {  
+  flex: 0 0 auto;            /* don’t let flexbox shrink it */
+  overflow: visible;         /* prevent clipping/cropping */
+  display: inline-block;     /* avoids width collapse */
+  box-sizing: content-box;   /* no padding interfering */  
+}

@@ -5,15 +5,15 @@ const bodyParser = require('body-parser')
 const cors = require('cors')
 
 const axios = require('axios');
-
 const crypto = require('crypto');
+const createPuzzle = require('node-puzzle');
 
 const jwt = require('jsonwebtoken');
 
 const https = require('https');
 const fs = require('fs');
-
 const path = require('path');
+
 const dotenv = require('dotenv');
 dotenv.config();
 
@@ -54,6 +54,14 @@ const minBlocks = 3; // Number of blocks to wait before sending payments
 const scanInterval = 5; // Time in minutes to scan donations
 
 let latestHeight = 0;
+
+// In-memory store for challenge puzzles
+const store = new Map(); // id -> { x, expiresAt, width, height }
+
+const BG_WIDTH = 320;
+const BG_HEIGHT = 205;
+const TOLERANCE = 4;     // pixels
+const TTL_MS = 2 * 60 * 1000;
 
 app.use(bodyParser.urlencoded({ extended: true }));
 app.use(bodyParser.json()) // to convert the request into JSON
@@ -721,6 +729,57 @@ app.post('/api/challenge', async (req, res) => {
             status: 400,
             message: "Invalid address! Please verify if you entered your Zcash address correctly and try again."
         });
+    }
+});
+
+app.post('/api/captcha/start', async (req, res) => {
+    try {
+        const id = crypto.randomUUID(); // TODO: Use challenge id
+        const filePath = path.join(__dirname, 'assets', 'bg1.png');
+        const imgBuf = fs.readFileSync(filePath);
+
+        const { bg, puzzle, x, y } = await createPuzzle(imgBuf, {
+            width: 60,
+            height: 60,
+            bgWidth: BG_WIDTH,
+            bgHeight: BG_HEIGHT,
+            imageWidth: BG_WIDTH,
+            imageHeight: BG_HEIGHT,
+            format: 'png',
+            bgFormat: 'jpeg',            
+        });
+
+        store.set(id, { x, y });
+
+        return res.json({
+            id,
+            bgUrl: `data:jpeg;base64,${bg.toString('base64')}`,
+            puzzleUrl: `data:png;base64,${puzzle.toString('base64')}`,
+        });
+    }
+    catch(err) {
+        res.status(500).json({ error: 'captcha_init_failed' });
+    }
+});
+
+app.post('/api/captcha/verify', async (req, res) => {
+    try {
+        const { id, x: clientX, scale } = req.body;
+        const row = store.get(id);
+        if (!row) return res.json({ success: false, reason: 'not_found' });
+        // if (row.expiresAt < Date.now()) return res.json({ success: false, reason: 'expired' });
+
+        const factor = Number(scale) || 1;
+        const expectedX = row.x * factor;
+        const ok = Math.abs(Number(clientX) - expectedX) <= TOLERANCE;
+
+        if (!ok) return res.json({ success: false, reason: 'mismatch' });
+
+        store.delete(id);
+        res.json({ success: true });
+    } catch (e) {
+        console.error('CAPTCHA /verify failed:', e);
+        res.status(500).json({ success: false, reason: 'server_error' });
     }
 });
 

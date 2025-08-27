@@ -5,6 +5,7 @@ import httpCommon from '../../http-common';
 import { useLocation } from 'react-router-dom';
 import './index.css';
 import VoucherModal from '../VoucherModal';
+import SliderCaptchaBox from '../SliderCaptcha';
 
 import { useGoogleReCaptcha } from 'react-google-recaptcha-v3';
 
@@ -12,6 +13,7 @@ export default function FaucetClaim( { applyVoucher } ) {
   const [userAddress, setUserAddress] = useState('');
   const [modalVisible, setModalVisible] = useState(false);
   const [challenge, setChallenge] = useState({});
+  const [puzzleSolved, setPuzzleSolved] = useState(false);
 
   const [voucherModalVisible, setVoucherModalVisible] = useState(false);
   const [voucher, setVoucher] = useState('');
@@ -24,6 +26,17 @@ export default function FaucetClaim( { applyVoucher } ) {
 
   const { pathname } = useLocation();
   
+  const handlePuzzleSolved = () => {
+    setTimeout(() => {
+      setPuzzleSolved(true);      
+    }, 1000);    
+  }
+
+  const handleResetPuzzle = () => {
+      setPuzzleSolved(false);
+      setCanClick(true);    
+  }
+
   useEffect(() => {
     // if(pathname === '/test') {
       console.log('Enabling voucher...')
@@ -116,9 +129,14 @@ export default function FaucetClaim( { applyVoucher } ) {
         onChange={handleInputChange}
         className="faucet-input"
       />
-      <button onClick={handleSubmit} className="faucet-button" disabled={!canClick}>
-        {canClick ? ("SEND NOW"):("Please wait ...")}        
-      </button>         
+      {puzzleSolved ? (
+        <button onClick={handleSubmit} className="faucet-button" disabled={!canClick}>
+          {canClick ? ("SEND NOW"):("Please wait ...")}        
+        </button>
+      ): (
+        <SliderCaptchaBox onPassed={handlePuzzleSolved} onReset={handleResetPuzzle} />
+
+      )}
 
       {/* Modals */}
       <ProofOfWorkModal

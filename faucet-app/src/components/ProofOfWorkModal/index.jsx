@@ -113,6 +113,10 @@ export default function ProofOfWorkModal({ visible, onDecline, onSuccess, challe
         onSuccess({ nonce, hash }); // should also send the solution hash
     }
 
+    const verifiedCallback = (token) => {
+        console.log(token)
+    }
+
     useEffect(() => {
         setMessage(challenge.msg);
         setDifficulty(challenge.difficulty);
@@ -139,7 +143,8 @@ export default function ProofOfWorkModal({ visible, onDecline, onSuccess, challe
                         To avoid fraudulent claims, ZecFaucet requires users to solve a cryptographic challenge.
                         In the context of cryptocurrencies, this is usually called a <strong>Proof of Work</strong>.<br /><br />
                         Keep in mind this process can take a few seconds to minutes to complete and may incur in high CPU usage and added electricity costs.
-                    </p>                    
+                    </p>         
+                 
                     <div className="pow-buttons">
                         {invertBtns ? (
                             <>
@@ -149,7 +154,7 @@ export default function ProofOfWorkModal({ visible, onDecline, onSuccess, challe
                         ) : (
                             <>
                                 <button onClick={declineChallenge} className="btn-decline">Decline</button>
-                                 <button onClick={startChallenge} className="btn-accept">Accept Challenge</button>
+                                <button onClick={startChallenge} className="btn-accept">Accept Challenge</button>
                             </>
                         )}                        
                     </div>

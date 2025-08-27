@@ -118,6 +118,11 @@
   padding: 0.75rem;
 }
 
+.donations-table .top-donation {
+  background-color: #fff7d1; /* light gold/yellow highlight */
+  font-weight: 500;
+}
+
 @media (max-width: 768px) {
   .stats-section {
     flex-direction: column;

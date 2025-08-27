@@ -88,14 +88,22 @@ export default function FaucetStats({ coin }) {
               </tr>
             </thead>
             <tbody>
-              {topDonations.map((donation, idx) => (
-                <tr key={idx}>
-                  <td>{donation.date}</td>
-                  <td>{donation.amount.toFixed(4)}</td>
-                  <td title={donation.memo}
->{donation.memo}</td>
-                </tr>
-              ))}
+              {topDonations.map((donation, idx) => {
+                const isTop3 = idx < 3;
+                const trophy = idx === 0 ? '🥇' : idx === 1 ? '🥈' : idx === 2 ? '🥉' : '';
+
+                return (
+                  <tr
+                    key={idx}
+                    className={isTop3 ? 'top-donation' : ''}
+                  >
+                    {/* <td>}</td> */}
+                    <td>{donation.date}</td>
+                    <td>{trophy} {donation.amount.toFixed(4)}</td>
+                    <td title={donation.memo}>{donation.memo}</td>
+                  </tr>
+                );
+              })}
             </tbody>
           </table>
         </div>

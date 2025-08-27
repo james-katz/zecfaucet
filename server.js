@@ -321,6 +321,14 @@ app.get('/api/dashboard-stats', async (req, res) => {
 });
 
 app.get('/api/txns', async (req, res) => {
+    const topDonations = await Transaction.findAll({
+        where: { 
+            kind: 'received',            
+         },
+        order: [['value', 'DESC']],
+        limit: 3
+    });
+
     const recentDonations = await Transaction.findAll({
         where: { 
             kind: 'received',
@@ -329,16 +337,32 @@ app.get('/api/txns', async (req, res) => {
             }
          },
         order: [['createdAt', 'DESC']],
-        limit: 10
+        limit: 7
     });
 
-    const donationsJson = recentDonations.map((el) => {
-        return {
-            'value': (el.value / 10**8),
-            'time': el.createdAt,
-            'memo': el.memo
-        }
+    // const donationsJson = recentDonations.map((el) => {
+    //     return {
+    //         'value': (el.value / 10**8),
+    //         'time': el.createdAt,
+    //         'memo': el.memo
+    //     }
+    // });
+    const donationsJson = [];
+    topDonations.forEach((el) => {
+        donationsJson.push({
+            value: (el.value / 10**8),
+            time: el.createdAt,
+            memo: el.memo
+        });  
     });
+    recentDonations.forEach((el) => {
+        donationsJson.push({
+            value: (el.value / 10**8),
+            time: el.createdAt,
+            memo: el.memo
+        });  
+    });
+
     res.json(donationsJson);
 });
 

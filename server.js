@@ -649,6 +649,7 @@ app.post('/api/challenge', async (req, res) => {
 
             // Global cooldown
             if(!voucherIsValid.valid && queue.length > 20) {
+                console.log("Cooldown active");
                 return res.send({
                     status: 503,
                     message: `ZecFaucet is in cooldown mode due to high number of claims. Please try again later.`

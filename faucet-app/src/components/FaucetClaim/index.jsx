@@ -146,7 +146,9 @@ export default function FaucetClaim( { applyVoucher } ) {
         visible={modalVisible}
         challenge={challenge}
         onDecline={() => {
-            setCanClick(true);          
+            setCanClick(true);
+            setPuzzleId("");
+            setPuzzleSolved(false);
             setModalVisible(false);
           }
         }

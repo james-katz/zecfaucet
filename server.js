@@ -565,15 +565,20 @@ app.post('/api/challenge', async (req, res) => {
         });
     }
 
-    // Is slider captcha resolved?
-    if(!store.get(puzzleId)) {
-       console.log("Slider was bypassed!");       
-    }
-    else {
+    // Is slider captcha solved?
+    const userPuzzle = store.get(puzzleId);
+    if(userPuzzle && userPuzzle.solved) {
         console.log("Slider was completed!");       
         store.delete(puzzleId);
     }
-    
+    else {
+        console.log("Slider was bypassed!");       
+        return res.send({
+            status: 403,
+            message: `Sorry, we couldn't verify you're not a robot.`
+        }); 
+    }
+
     const userIp = getClientIp(req);    
     let isVpn = false;
     let reScore = 1.0;
@@ -821,6 +826,7 @@ app.post('/api/captcha/verify', async (req, res) => {
         if (!ok) return res.json({ success: false, reason: 'mismatch' });
 
         // store.delete(id);
+        store.set(id, {solved: true});
         res.json({ success: true });
     } catch (e) {
         console.error('CAPTCHA /verify failed:', e);

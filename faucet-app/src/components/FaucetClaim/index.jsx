@@ -14,6 +14,7 @@ export default function FaucetClaim( { applyVoucher } ) {
   const [modalVisible, setModalVisible] = useState(false);
   const [challenge, setChallenge] = useState({});
   const [puzzleSolved, setPuzzleSolved] = useState(false);
+  const [puzzleId, setPuzzleId] = useState("");
 
   const [voucherModalVisible, setVoucherModalVisible] = useState(false);
   const [voucher, setVoucher] = useState('');
@@ -26,14 +27,16 @@ export default function FaucetClaim( { applyVoucher } ) {
 
   const { pathname } = useLocation();
   
-  const handlePuzzleSolved = () => {
+  const handlePuzzleSolved = (id) => {
     setTimeout(() => {
       setPuzzleSolved(true);      
+      setPuzzleId(id);
     }, 1000);    
   }
 
   const handleResetPuzzle = () => {
       setPuzzleSolved(false);
+      setPuzzleId("");
       setCanClick(true);    
   }
 
@@ -70,7 +73,7 @@ export default function FaucetClaim( { applyVoucher } ) {
 
     const captchaToken = await executeRecaptcha('claim');
 
-    httpCommon.post('/challenge', { address: userAddress, voucher: voucher, token: captchaToken } ).then((res) => {
+    httpCommon.post('/challenge', { address: userAddress, voucher: voucher, token: captchaToken, puzzle: puzzleId } ).then((res) => {
       if(res.data && res.data.status == 200) {        
         setChallenge({
           id: res.data.message.id,

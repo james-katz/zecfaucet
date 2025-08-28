@@ -45,7 +45,7 @@ export default function SliderCaptchaBox({ onPassed, onReset }) {
               onReset?.();
             }, 60 * 1000);
 
-            onPassed?.();            
+            onPassed?.(tokenRef.current);            
             return Promise.resolve();
           }
           return Promise.reject(new Error(data.reason || 'verify_failed'));

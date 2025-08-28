@@ -258,7 +258,7 @@ app.get('/api/donate', async (req, res) => {
 });
 
 app.get('/api/balance', async (req, res) => {    
-    const bal = zingo.fetchTotalSpendableBalance() / 10**8;
+    const bal = zingo.fetchTotalSpendableBalance();
     return res.send(`${bal.toFixed(8)}`);
 });
 
@@ -554,7 +554,8 @@ app.post('/api/challenge', async (req, res) => {
     const userAddr = req.body.address;
     const reCaptchaToken = req.body.token;
     const voucherIsValid = await checkValidVoucher(req.body.voucher);
-    
+    const puzzleId = req.body.puzzle;
+
     // CHeck if faucet is closed for voucher holderd
     if(faucetClosed && !voucherIsValid.valid) {
         console.log("User without a voucher.");
@@ -564,6 +565,15 @@ app.post('/api/challenge', async (req, res) => {
         });
     }
 
+    // Is slider captcha resolved?
+    if(!store.get(puzzleId)) {
+       console.log("Slider was bypassed!");       
+    }
+    else {
+        console.log("Slider was completed!");       
+        store.delete(puzzleId);
+    }
+    
     const userIp = getClientIp(req);    
     let isVpn = false;
     let reScore = 1.0;
@@ -637,7 +647,7 @@ app.post('/api/challenge', async (req, res) => {
             
             // Then check if faucet has enough balance
             // TODO: Move to a separete function
-            const bal = zingo.fetchTotalSpendableBalance() / 10**8;
+            const bal = zingo.fetchTotalSpendableBalance();
             // const bal = 1.3;
             const pay = voucherIsValid.valid ? voucherIsValid.voucher.payout : u_payout;
             
@@ -810,7 +820,7 @@ app.post('/api/captcha/verify', async (req, res) => {
 
         if (!ok) return res.json({ success: false, reason: 'mismatch' });
 
-        store.delete(id);
+        // store.delete(id);
         res.json({ success: true });
     } catch (e) {
         console.error('CAPTCHA /verify failed:', e);

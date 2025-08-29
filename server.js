@@ -8,6 +8,8 @@ const axios = require('axios');
 const crypto = require('crypto');
 const createPuzzle = require('node-puzzle');
 
+const { verifySlider } = require('./verify_captcha');
+
 const jwt = require('jsonwebtoken');
 
 const https = require('https');
@@ -812,27 +814,51 @@ app.post('/api/captcha/start', async (req, res) => {
     }
 });
 
-app.post('/api/captcha/verify', async (req, res) => {
-    try {
-        const { id, x: clientX, scale } = req.body;
+app.post('/api/captcha/verify', async (req, res) => { 
+    try {        
+        const { id } = req.body;
         const row = store.get(id);
         if (!row) return res.json({ success: false, reason: 'not_found' });
-        // if (row.expiresAt < Date.now()) return res.json({ success: false, reason: 'expired' });
+        // if (row.expiresAt < new Date()) return res.json({ success: false, reason: 'expired' });
 
-        const factor = Number(scale) || 1;
-        const expectedX = row.x * factor;
-        const ok = Math.abs(Number(clientX) - expectedX) <= TOLERANCE;
-
-        if (!ok) return res.json({ success: false, reason: 'mismatch' });
-
-        // store.delete(id);
-        store.set(id, {solved: true});
-        res.json({ success: true });
+        const verdict = verifySlider(row, req.body);
+        
+        if (!verdict.ok) {
+            console.log(verdict.reason)
+            console.log(verdict.meta)
+            return res.json({ success: false, reason: verdict.reason });
+        }
+        
+        return res.json({ success: true });
     } catch (e) {
-        console.error('CAPTCHA /verify failed:', e);
+        console.error(e);
         res.status(500).json({ success: false, reason: 'server_error' });
     }
 });
+
+// app.post('/api/captcha/verify', async (req, res) => {
+//     try {
+//         const { id} = req.body;
+//         const row = store.get(id);
+//         if (!row) return res.json({ success: false, reason: 'not_found' });
+//         // if (row.expiresAt < Date.now()) return res.json({ success: false, reason: 'expired' });
+
+//         const factor = Number(scale) || 1;
+//         const expectedX = row.x * factor;
+//         const ok = Math.abs(Number(clientX) - expectedX) <= TOLERANCE;
+
+//         if (!ok) {
+//             store.delete(id);
+//             return res.json({ success: false, reason: 'mismatch' });
+//         } 
+
+//         store.set(id, {solved: true});
+//         res.json({ success: true });
+//     } catch (e) {
+//         console.error('CAPTCHA /verify failed:', e);
+//         res.status(500).json({ success: false, reason: 'server_error' });
+//     }
+// });
 
 app.post('/api/add', async (req, res) => {
     const userAddr = req.body.address;

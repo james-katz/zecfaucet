@@ -36,7 +36,9 @@ export default function SliderCaptchaBox({ onPassed, onReset }) {
           const { data } = await httpCommon.post('/captcha/verify', {
             id: tokenRef.current,
             x: payload.x,
-            scale: scale
+            scale: scale,
+            duration: payload.duration,
+            trail: payload.trail,
           });
           if (data.success) {
             setTimeout(() => {

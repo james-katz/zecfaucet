@@ -52,8 +52,10 @@ const memo = `Thanks for using ${network == 'test' ? 'testnet.' : ''}ZecFaucet.c
 // Queue for the faucet payout
 const waitTime = network == "main" ? 120 : 15; // Time in minuts before next claim
 const payInterval = 3; // Time in minuts between payments
-const minBlocks = 3; // Number of blocks to wait before sending payments
-const scanInterval = 5; // Time in minutes to scan donations
+const minBlocks = 4; // Number of blocks to wait before sending payments
+const scanInterval = 50; // Time in minutes to scan donations
+
+const cooldown = false;
 
 let latestHeight = 0;
 
@@ -713,8 +715,11 @@ app.post('/api/challenge', async (req, res) => {
                 });
                 console.log(`Faucet claims/hour: ${claimsPerHour}`);
                 
+                if(claimsPerHour >= 8 || queue.length >= 3) cooldown = true;
+                if(claimsPerHour <= 3) cooldown = false;
+
                 // Global cooldown
-                if(!voucherIsValid.valid && claimsPerHour > 20) {
+                if(!voucherIsValid.valid && cooldown) {
                     console.log("Cooldown active");
                     return res.send({
                         status: 503,
@@ -722,10 +727,10 @@ app.post('/api/challenge', async (req, res) => {
                     });
                 }
                 
-                const base = isVpn ? 15 : 5;
-                let baseDiff = Math.min(15, base + Math.floor(claimsPerHour / 8));
+                const base = isVpn ? 15 : 8;
+                let baseDiff = Math.min(15, base + Math.floor(claimsPerHour / 4));
 
-                const reScoreCapped = Math.max(0.3, Math.min(1.0, reScore));
+                // const reScoreCapped = Math.max(0.3, Math.min(1.0, reScore));
                 // baseDiff += Math.round(((1.0 - reScoreCapped) / 0.7) * 3);
                 
                 // Get the total user claims (wallet address or IP)
@@ -787,12 +792,26 @@ app.post('/api/challenge', async (req, res) => {
 app.post('/api/captcha/start', async (req, res) => {
     try {
         const id = crypto.randomUUID(); // TODO: Use challenge id
-        const filePath = path.join(__dirname, 'assets', 'bg1.png');
+        
+        const bgList = ["bg1.png", "bg2.png", "bg3.png"];
+        const pick = bgList[Math.floor(Math.random() * bgList.length)];
+
+        const filePath = path.join(__dirname, 'assets', pick);
         const imgBuf = fs.readFileSync(filePath);
+        const randomRGBA = () => {
+            const r = Math.floor(Math.random() * 256);
+            const g = Math.floor(Math.random() * 256);
+            const b = Math.floor(Math.random() * 256);
+            // const a = Math.random().toFixed(2); // alpha between 0.00 and 1.00
+            const a = 0.7;
+            return `rgba(${r},${g},${b},${a})`;
+        } 
 
         const { bg, puzzle, x, y } = await createPuzzle(imgBuf, {
             width: 60,
-            height: 60,
+            height: 60,            
+            borderColor: `${randomRGBA()}`,
+            fillColor: `${randomRGBA()}`,
             bgWidth: BG_WIDTH,
             bgHeight: BG_HEIGHT,
             imageWidth: BG_WIDTH,
@@ -824,10 +843,13 @@ app.post('/api/captcha/verify', async (req, res) => {
         const verdict = verifySlider(row, req.body);
         
         if (!verdict.ok) {
-            console.log(verdict.reason)
-            console.log(verdict.meta)
+            console.log(verdict.reason);
+            console.log(verdict.meta);
+            store.delete(id);
             return res.json({ success: false, reason: verdict.reason });
         }
+
+        store.set(id, { solved: true });
         
         return res.json({ success: true });
     } catch (e) {

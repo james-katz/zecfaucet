@@ -52,10 +52,10 @@ const memo = `Thanks for using ${network == 'test' ? 'testnet.' : ''}ZecFaucet.c
 // Queue for the faucet payout
 const waitTime = network == "main" ? 120 : 15; // Time in minuts before next claim
 const payInterval = 3; // Time in minuts between payments
-const minBlocks = 4; // Number of blocks to wait before sending payments
+const minBlocks = 3; // Number of blocks to wait before sending payments
 const scanInterval = 50; // Time in minutes to scan donations
 
-const cooldown = false;
+let cooldown = false;
 
 let latestHeight = 0;
 
@@ -64,8 +64,7 @@ const store = new Map(); // id -> { x, expiresAt, width, height }
 
 const BG_WIDTH = 320;
 const BG_HEIGHT = 205;
-const TOLERANCE = 4;     // pixels
-const TTL_MS = 2 * 60 * 1000;
+// const TTL_MS = 2 * 60 * 1000;
 
 app.use(bodyParser.urlencoded({ extended: true }));
 app.use(bodyParser.json()) // to convert the request into JSON
@@ -165,7 +164,7 @@ zingo.init().then(async () => {
                 }
             }).catch((err) => {
                 console.log(err);
-                process.kill(process.pid, "SIGINT");
+                // process.kill(process.pid, "SIGINT");
             });
         }  
     }, payInterval * 60 * 1000);    
@@ -569,20 +568,6 @@ app.post('/api/challenge', async (req, res) => {
         });
     }
 
-    // Is slider captcha solved?
-    const userPuzzle = store.get(puzzleId);
-    if(userPuzzle && userPuzzle.solved) {
-        console.log("Slider was completed!");       
-        store.delete(puzzleId);
-    }
-    else {
-        console.log("Slider was bypassed!");       
-        return res.send({
-            status: 403,
-            message: `Sorry, we couldn't verify you're not a robot.`
-        }); 
-    }
-
     const userIp = getClientIp(req);    
     let isVpn = false;
     let reScore = 1.0;
@@ -725,6 +710,20 @@ app.post('/api/challenge', async (req, res) => {
                         status: 503,
                         message: `ZecFaucet is in cooldown mode due to high number of claims. Please try again later.`
                     });
+                }
+
+                // Is slider captcha solved?
+                const userPuzzle = store.get(puzzleId);
+                if(userPuzzle && userPuzzle.solved) {
+                    console.log("Slider was completed!");       
+                    store.delete(puzzleId);
+                }
+                else {
+                    console.log("Slider was bypassed!");       
+                    return res.send({
+                        status: 403,
+                        message: `Sorry, we couldn't verify you're not a robot.`
+                    }); 
                 }
                 
                 const base = isVpn ? 15 : 8;

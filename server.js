@@ -792,7 +792,13 @@ app.post('/api/captcha/start', async (req, res) => {
     try {
         const id = crypto.randomUUID(); // TODO: Use challenge id
         
-        const bgList = ["bg1.png", "bg2.png", "bg3.png"];
+        const bgList = [
+            "bg1.png", 
+            "bg2.png", 
+            "bg3.png",
+            "bg4.png",
+            "bg5.png",
+        ];
         const pick = bgList[Math.floor(Math.random() * bgList.length)];
 
         const filePath = path.join(__dirname, 'assets', pick);

@@ -559,6 +559,20 @@ app.post('/api/challenge', async (req, res) => {
     const voucherIsValid = await checkValidVoucher(req.body.voucher);
     const puzzleId = req.body.puzzle;
 
+    // Is slider captcha solved?
+    const userPuzzle = store.get(puzzleId);
+    if(userPuzzle && userPuzzle.solved) {
+        console.log("Slider was completed!");       
+        store.delete(puzzleId); // maybe move this further down
+    }
+    else {
+        console.log("Slider was bypassed!");       
+        return res.send({
+            status: 403,
+            message: `Sorry, we couldn't verify you're not a robot.`
+        }); 
+    }
+
     // CHeck if faucet is closed for voucher holderd
     if(faucetClosed && !voucherIsValid.valid) {
         console.log("User without a voucher.");
@@ -587,6 +601,18 @@ app.post('/api/challenge', async (req, res) => {
             try {        
                 const ipAddress = userIp.match(/(\d{1,3}\.\d{1,3}\.\d{1,3}\.\d{1,3})$/)[0];
                 
+                // geolocation log
+                const geo = await axios.get(`http://ip-api.com/json/${ipAddress}`);
+                if(geo && geo.status == "success") {
+                    const country = geo.data.country;
+                    const regionName = geo.data.regionName;
+                    const isp = geo.data.isp;
+                    console.log(`ISP: ${isp} | Country: ${country} | Region: ${regionName}`);
+                }
+                else {
+                    console.log("No geolocation data.")
+                }
+
                 // Buf first of all, check reCaptcha v3 token
                 const params = new URLSearchParams();
                 params.append('secret', reCaptchaKey);
@@ -712,20 +738,6 @@ app.post('/api/challenge', async (req, res) => {
                     });
                 }
 
-                // Is slider captcha solved?
-                const userPuzzle = store.get(puzzleId);
-                if(userPuzzle && userPuzzle.solved) {
-                    console.log("Slider was completed!");       
-                    store.delete(puzzleId);
-                }
-                else {
-                    console.log("Slider was bypassed!");       
-                    return res.send({
-                        status: 403,
-                        message: `Sorry, we couldn't verify you're not a robot.`
-                    }); 
-                }
-                
                 const base = isVpn ? 15 : 8;
                 let baseDiff = Math.min(15, base + Math.floor(claimsPerHour / 4));
 

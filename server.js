@@ -53,7 +53,7 @@ const memo = `Thanks for using ${network == 'test' ? 'testnet.' : ''}ZecFaucet.c
 const waitTime = network == "main" ? 120 : 15; // Time in minuts before next claim
 const payInterval = 3; // Time in minuts between payments
 const minBlocks = 3; // Number of blocks to wait before sending payments
-const scanInterval = 50; // Time in minutes to scan donations
+const scanInterval = 10; // Time in minutes to scan donations
 
 let cooldown = false;
 
@@ -172,7 +172,11 @@ zingo.init().then(async () => {
     // Check new donations
     const donationsTimerId = setInterval(async () => {
         const sendProgress = zingo.isSending;
-        if(sendProgress) return;
+        const refreshing = zingo.inRefresh;
+        if(sendProgress || refreshing) {
+            console.log("Wallet sending or refreshing, skipping donation detection");
+            return;
+        }
         
         const lastDbTxid = await Transaction.findAll({
             where: { kind: 'received' },
@@ -261,12 +265,8 @@ app.get('/api/donate', async (req, res) => {
 });
 
 app.get('/api/balance', async (req, res) => {    
-    const bal = zingo.fetchTotalSpendableBalance();
+    const bal = zingo.totalSpendableBalance / 10**8;
     return res.send(`${bal.toFixed(8)}`);
-});
-
-app.get('/api/log', async (req, res) => {
-    res.sendFile(path.join(__dirname, 'log.txt'));
 });
 
 app.get('/api/dashboard-stats', async (req, res) => {
@@ -287,7 +287,7 @@ app.get('/api/dashboard-stats', async (req, res) => {
         where: { kind: 'received' }
     });
 
-    const balance = zingo.fetchTotalSpendableBalance();
+    const balance = zingo.totalSpendableBalance / 10**8;
 
     const sevenDaysAgo = new Date(Date.now() - 7 * 24 * 60 * 60 * 1000);
 
@@ -667,7 +667,7 @@ app.post('/api/challenge', async (req, res) => {
             
             // Then check if faucet has enough balance
             // TODO: Move to a separete function
-            const bal = zingo.fetchTotalSpendableBalance();
+            const bal = zingo.totalSpendableBalance / 10**8;
             // const bal = 1.3;
             const pay = voucherIsValid.valid ? voucherIsValid.voucher.payout : u_payout;
             
@@ -738,7 +738,8 @@ app.post('/api/challenge', async (req, res) => {
                     });
                 }
 
-                const base = isVpn ? 15 : 8;
+                // const base = isVpn ? 15 : 8;
+                const base = network == 'test' ? 5 : 8;
                 let baseDiff = Math.min(15, base + Math.floor(claimsPerHour / 4));
 
                 // const reScoreCapped = Math.max(0.3, Math.min(1.0, reScore));

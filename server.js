@@ -562,8 +562,24 @@ app.post('/api/challenge', async (req, res) => {
     // Is slider captcha solved?
     const userPuzzle = store.get(puzzleId);
     if(userPuzzle && userPuzzle.solved) {
-        console.log("Slider was completed!");       
-        store.delete(puzzleId); // maybe move this further down
+        console.log("Slider was completed!"); 
+        // Also check id signature
+        const userSig = puzzleId.split("-");
+        
+        if(userSig && userSig[1]) {
+            const signature = crypto
+                .createHmac('sha256', SECRET_KEY)
+                .update(String(userSig[1]))
+                .digest('base64url');
+            if(signature === userSig[0]) {
+                console.log("Correct signature");
+            }
+            else {
+                console.log("Invalid signature");
+            }
+        }
+              
+        store.delete(puzzleId);
     }
     else {
         console.log("Slider was bypassed!");       
@@ -803,7 +819,13 @@ app.post('/api/challenge', async (req, res) => {
 
 app.post('/api/captcha/start', async (req, res) => {
     try {
-        const id = crypto.randomUUID(); // TODO: Use challenge id
+        const timestamp = Date.now();
+        const signature = crypto
+            .createHmac('sha256', SECRET_KEY)
+            .update(String(timestamp))
+            .digest('base64url');
+        const id = `${signature}-${timestamp}`;
+        // console.log(id);
         
         const bgList = [
             "bg1.png", 
@@ -837,8 +859,8 @@ app.post('/api/captcha/start', async (req, res) => {
             format: 'png',
             bgFormat: 'jpeg',            
         });
-
-        store.set(id, { x, y });
+        
+        store.set(id, { x, y, expiresAt: timestamp + 15000 });
 
         return res.json({
             id,
@@ -847,6 +869,7 @@ app.post('/api/captcha/start', async (req, res) => {
         });
     }
     catch(err) {
+        console.log(err)
         res.status(500).json({ error: 'captcha_init_failed' });
     }
 });
@@ -855,14 +878,17 @@ app.post('/api/captcha/verify', async (req, res) => {
     try {        
         const { id } = req.body;
         const row = store.get(id);
-        if (!row) return res.json({ success: false, reason: 'not_found' });
-        // if (row.expiresAt < new Date()) return res.json({ success: false, reason: 'expired' });
+        if (!row) return res.json({ success: false, reason: 'not_found' });            
+        if (row.expiresAt < new Date()) {
+            console.log("Expired puzzle");
+            return res.json({ success: false, reason: 'expired' });
+        }
 
         const verdict = verifySlider(row, req.body);
         
         if (!verdict.ok) {
             console.log(verdict.reason);
-            console.log(verdict.meta);
+            // console.log(verdict.meta);
             store.delete(id);
             return res.json({ success: false, reason: verdict.reason });
         }

@@ -8,8 +8,9 @@ const DESIGN_W = 320;
 const DESIGN_H = 205;
 
 export default function SliderCaptchaBox({ onPassed, onReset }) {
-  const tokenRef = useRef(null);  
-  const [key, setKey] = useState(0);
+  const tokenRef = useRef(null); 
+  const seedRef = useRef(null) ;
+  // const [key, setKey] = useState(0);
   const [bgSize, setBgSize] = useState({ width: DESIGN_W, height: DESIGN_H });
   const [scale, setScale] = useState(1);
 
@@ -19,16 +20,19 @@ export default function SliderCaptchaBox({ onPassed, onReset }) {
       const scl = captchaWidth / DESIGN_W;      
       setBgSize({ width: captchaWidth, height: DESIGN_H * scl });
       setScale(scl);
-  }, [key]);
+  }, []);
 
   return (
     <div className="captcha-wrap">
       <SliderCaptcha
         // key={key}
         request={async () => {
-          const { data } = await httpCommon.post('/captcha/start');
+          const randomSeed = Math.random().toString(36).substring(2, 10);
+          seedRef.current = randomSeed;          
+          console.log(seedRef.current)
+          const { data } = await httpCommon.post('/captcha/start', {seed: seedRef.current});
           tokenRef.current = data.id;
-
+          
           return { bgUrl: data.bgUrl, puzzleUrl: data.puzzleUrl };
         }}
         onVerify={async (payload) => {
@@ -43,11 +47,12 @@ export default function SliderCaptchaBox({ onPassed, onReset }) {
           if (data.success) {
             setTimeout(() => {
               tokenRef.current = null;
+              seedRef.current = null;
               // setKey(key + 1);              
               onReset?.();
             }, 60 * 1000);
 
-            onPassed?.(tokenRef.current);            
+            onPassed?.(tokenRef.current, seedRef.current);            
             return Promise.resolve();
           }
           return Promise.reject(new Error(data.reason || 'verify_failed'));

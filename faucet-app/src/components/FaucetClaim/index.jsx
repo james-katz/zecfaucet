@@ -15,6 +15,7 @@ export default function FaucetClaim( { applyVoucher } ) {
   const [challenge, setChallenge] = useState({});
   const [puzzleSolved, setPuzzleSolved] = useState(false);
   const [puzzleId, setPuzzleId] = useState("");
+  const [puzzleSeed, setPuzzleSeed] = useState("");
 
   const [voucherModalVisible, setVoucherModalVisible] = useState(false);
   const [voucher, setVoucher] = useState('');
@@ -27,16 +28,18 @@ export default function FaucetClaim( { applyVoucher } ) {
 
   const { pathname } = useLocation();
   
-  const handlePuzzleSolved = (id) => {
+  const handlePuzzleSolved = (id, seed) => {
     setTimeout(() => {
       setPuzzleSolved(true);      
       setPuzzleId(id);
+      setPuzzleSeed(seed);
     }, 1000);    
   }
 
   const handleResetPuzzle = () => {
       setPuzzleSolved(false);
       setPuzzleId("");
+      setPuzzleSeed("");
       setCanClick(true);    
   }
 
@@ -73,7 +76,7 @@ export default function FaucetClaim( { applyVoucher } ) {
 
     const captchaToken = await executeRecaptcha('claim');
 
-    httpCommon.post('/challenge', { address: userAddress, voucher: voucher, token: captchaToken, puzzle: puzzleId } ).then((res) => {
+    httpCommon.post('/challenge', { address: userAddress, voucher: voucher, token: captchaToken, puzzle: puzzleId, seed: puzzleSeed } ).then((res) => {
       if(res.data && res.data.status == 200) {        
         setChallenge({
           id: res.data.message.id,
@@ -84,7 +87,8 @@ export default function FaucetClaim( { applyVoucher } ) {
         setModalVisible(true);
       }
       else if(res.data && res.data.message) {
-        setCanClick(true);
+        // setCanClick(true);
+        handleResetPuzzle();
         toast.error(res.data.message);
       }
       else {
@@ -114,6 +118,7 @@ export default function FaucetClaim( { applyVoucher } ) {
             toast.success(res.data.message);
           }
           else if(res.data && res.data.message) {
+            handleResetPuzzle();
             toast.error(res.data.message);
           }
         });

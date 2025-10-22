@@ -558,24 +558,41 @@ app.post('/api/challenge', async (req, res) => {
     const reCaptchaToken = req.body.token;
     const voucherIsValid = await checkValidVoucher(req.body.voucher);
     const puzzleId = req.body.puzzle;
+    const puzzleSeed = req.body.seed;
+    console.log(puzzleId)
+    console.log(puzzleSeed)
 
     // Is slider captcha solved?
     const userPuzzle = store.get(puzzleId);
     if(userPuzzle && userPuzzle.solved) {
         console.log("Slider was completed!"); 
         // Also check id signature
-        const userSig = puzzleId.split("-");
+        const userSig = puzzleId.split(".");
         
         if(userSig && userSig[1]) {
+            if(Number(userSig[1]) < Date.now()) {
+                console.log("Too slow to claim");
+                store.delete(puzzleId);
+                return res.send({
+                    status: 403,
+                    message: `Sorry, we couldn't verify you're not a robot.`
+                });
+            }
+
             const signature = crypto
                 .createHmac('sha256', SECRET_KEY)
-                .update(String(userSig[1]))
+                .update(`${userSig[1]}-${puzzleSeed}`)
                 .digest('base64url');
             if(signature === userSig[0]) {
                 console.log("Correct signature");
             }
             else {
                 console.log("Invalid signature");
+                store.delete(puzzleId);
+                return res.send({
+                    status: 403,
+                    message: `Sorry, we couldn't verify you're not a robot.`
+                });
             }
         }
               
@@ -619,11 +636,11 @@ app.post('/api/challenge', async (req, res) => {
                 
                 // geolocation log
                 const geo = await axios.get(`http://ip-api.com/json/${ipAddress}`);
-                if(geo && geo.status == "success") {
+                if(geo.data && geo.data.status == "success") {
                     const country = geo.data.country;
                     const regionName = geo.data.regionName;
-                    const isp = geo.data.isp;
-                    console.log(`ISP: ${isp} | Country: ${country} | Region: ${regionName}`);
+                    // const isp = geo.data.isp;
+                    console.log(`Country: ${country} | Region: ${regionName}`);
                 }
                 else {
                     console.log("No geolocation data.")
@@ -684,7 +701,7 @@ app.post('/api/challenge', async (req, res) => {
             // Then check if faucet has enough balance
             // TODO: Move to a separete function
             const bal = zingo.totalSpendableBalance / 10**8;
-            // const bal = 1.3;
+            
             const pay = voucherIsValid.valid ? voucherIsValid.voucher.payout : u_payout;
             
             const queue = await Claim.findAll({
@@ -818,13 +835,15 @@ app.post('/api/challenge', async (req, res) => {
 });
 
 app.post('/api/captcha/start', async (req, res) => {
+    const seed = req.body.seed || "";
+    
     try {
-        const timestamp = Date.now();
+        const timestamp = Date.now() + 30 * 1000;
         const signature = crypto
             .createHmac('sha256', SECRET_KEY)
-            .update(String(timestamp))
+            .update(`${timestamp}-${seed}`)
             .digest('base64url');
-        const id = `${signature}-${timestamp}`;
+        const id = `${signature}.${timestamp}`;
         // console.log(id);
         
         const bgList = [
@@ -860,7 +879,11 @@ app.post('/api/captcha/start', async (req, res) => {
             bgFormat: 'jpeg',            
         });
         
-        store.set(id, { x, y, expiresAt: timestamp + 15000 });
+        // Check if id already exist somehow
+        const row = store.get(id);
+        if (row) throw("id_exist");
+        
+        store.set(id, { x, y, expiresAt: timestamp, seed });
 
         return res.json({
             id,
@@ -881,6 +904,7 @@ app.post('/api/captcha/verify', async (req, res) => {
         if (!row) return res.json({ success: false, reason: 'not_found' });            
         if (row.expiresAt < new Date()) {
             console.log("Expired puzzle");
+            store.delete(id);
             return res.json({ success: false, reason: 'expired' });
         }
 

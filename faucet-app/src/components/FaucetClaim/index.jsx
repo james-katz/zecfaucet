@@ -27,6 +27,13 @@ export default function FaucetClaim( { applyVoucher } ) {
   const { executeRecaptcha } = useGoogleReCaptcha();
 
   const { pathname } = useLocation();
+
+  const applyVoucherCode = (code) => {
+    if (!code) return;
+    const normalizedCode = code.trim().toUpperCase();
+    setVoucher(normalizedCode);
+    applyVoucher(normalizedCode);
+  };
   
   const handlePuzzleSolved = (id, seed) => {
     setTimeout(() => {
@@ -64,10 +71,48 @@ export default function FaucetClaim( { applyVoucher } ) {
   }
 
   const onSuccessVoucher = ({code}) => {    
-    setVoucher(code);
-    applyVoucher(code);
+    applyVoucherCode(code);
     setVoucherModalVisible(false);
   }
+
+  useEffect(() => {
+    if (!pathname) {
+      return;
+    }
+
+    const segments = pathname.split('/').filter(Boolean);
+    if (!segments.length) {
+      return;
+    }
+
+    const candidate = segments[segments.length - 1];
+    if (!candidate) {
+      return;
+    }
+
+    const normalizedCode = candidate.trim().toUpperCase();
+    const voucherPattern = /^[A-Z0-9]{4}-[A-Z0-9]{4}$/;
+
+    if (!voucherPattern.test(normalizedCode)) {
+      return;
+    }
+
+    if (normalizedCode === voucher.toUpperCase()) {
+      return;
+    }
+
+    httpCommon.get(`voucher?code=${normalizedCode}`).then((res) => {
+      if (res.data?.status === 200) {
+        toast.success(res.data.message);
+        applyVoucherCode(normalizedCode);
+      }
+      else if (res.data?.message) {
+        toast.error(res.data.message);
+      }
+    }).catch(() => {
+      toast.error('Service unavailable.');
+    });
+  }, [pathname, voucher]);
 
   const handleSubmit = async() => {
     if (!userAddress) return toast.error('Please enter a Zcash Unified address!');

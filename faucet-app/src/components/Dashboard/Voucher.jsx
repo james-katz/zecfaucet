@@ -11,6 +11,7 @@ export default function Voucher({ setLogin }) {
   const [newVoucherVisible, setNewVoucherVisible] = useState(false);
 
   const [voucherList, setVoucherList] = useState([]);
+  const [hideApiVouchers, setHideApiVouchers] = useState(false);
 
   const [newVoucherCode, setNewVoucherCode] = useState('');
   const [newVoucherAmount, setNewVoucherAmount] = useState(0);
@@ -55,14 +56,12 @@ export default function Voucher({ setLogin }) {
     const userId = localStorage.getItem('userId');
 
     const newVoucher = {
-      user: userId, //TODO: implement login
+      user: userId,
       code: newVoucherCode,
       payout: newVoucherAmount,
       memo: newVoucherMemo,
       supply: newVoucherSupply
     }
-
-    
 
     httpCommon.post('/vouchers/create', newVoucher, {headers: {
       Authorization: `Bearer ${token}`
@@ -124,6 +123,10 @@ export default function Voucher({ setLogin }) {
     fetchVouchers();
   }, []);
 
+  const filteredVoucherList = hideApiVouchers
+    ? voucherList
+    : voucherList.filter((voucher) => voucher.user?.username !== 'api');
+
   return (
     <section className="dashboard-section">
       <h2>ZecFaucet coupons</h2>
@@ -174,10 +177,17 @@ export default function Voucher({ setLogin }) {
           </div>
         </div>
       )}
-      
+      <label className="voucher-filter">
+        <input
+          type="checkbox"          
+          checked={hideApiVouchers}
+          onChange={(e) => setHideApiVouchers(e.target.checked)}
+        />
+        Show vouchers created from API
+      </label>
 
       <div className='voucher-list'>
-        {voucherList.map(voucher => (
+        {filteredVoucherList.map(voucher => (
           <VoucherItem
             key={voucher.id}
             id={voucher.id}
@@ -195,4 +205,3 @@ export default function Voucher({ setLogin }) {
     </section>
   );
 }
-

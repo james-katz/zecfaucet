@@ -31,6 +31,7 @@ const faucetClosed = process.env.FAUCET_CLOSED === "true";
 const reCaptchaKey = process.env.RECAPTCHA_SECRET_KEY;
 const useRecaptcha = process.env.USE_RECAPTCHA === "true";
 const SECRET_KEY = process.env.JWT_SECRET_KEY; // Store securely in .env
+const API_VOUCHER_TOKEN = process.env.API_VOUCHER_TOKEN;
 
 const LiteWallet = require('./zingolib-wrapper/zingolib');
 const { TxBuilder } = require('./zingolib-wrapper/utils/utils');
@@ -559,8 +560,8 @@ app.post('/api/challenge', async (req, res) => {
     const voucherIsValid = await checkValidVoucher(req.body.voucher);
     const puzzleId = req.body.puzzle;
     const puzzleSeed = req.body.seed;
-    console.log(puzzleId)
-    console.log(puzzleSeed)
+    // console.log(puzzleId)
+    // console.log(puzzleSeed)
 
     // Is slider captcha solved?
     const userPuzzle = store.get(puzzleId);
@@ -609,7 +610,7 @@ app.post('/api/challenge', async (req, res) => {
     // CHeck if faucet is closed for voucher holderd
     if(faucetClosed && !voucherIsValid.valid) {
         console.log("User without a voucher.");
-        res.send({
+        return res.send({
             status: 403,
             message: `The faucet is temporarily restricted to coupon holders. Come back soon!`
         });
@@ -633,13 +634,22 @@ app.post('/api/challenge', async (req, res) => {
             // Check if user is using proxy/vpn,            
             try {        
                 const ipAddress = userIp.match(/(\d{1,3}\.\d{1,3}\.\d{1,3}\.\d{1,3})$/)[0];
-                
+                const blacklisted = ['RU', 'ID', 'IN', 'VN', 'BG', 'RO'];
+
                 // geolocation log
                 const geo = await axios.get(`http://ip-api.com/json/${ipAddress}`);
                 if(geo.data && geo.data.status == "success") {
                     const country = geo.data.country;
                     const regionName = geo.data.regionName;
+                    const code = geo.data.countryCode;
                     // const isp = geo.data.isp;
+                    if (blacklisted.includes(code)) {
+                        console.log(`Blocked region detected: ${country} (${code})`);
+                        return res.status(403).send({
+                        status: 403,
+                        message: `ZecFaucet is temporarily unavailable. Please try again later.`
+                        });
+                    }
                     console.log(`Country: ${country} | Region: ${regionName}`);
                 }
                 else {
@@ -834,10 +844,9 @@ app.post('/api/challenge', async (req, res) => {
     }
 });
 
-app.post('/api/captcha/start', async (req, res) => {
-    const seed = req.body.seed || "";
-    
+app.post('/api/captcha/start', async (req, res) => {    
     try {
+        const seed = req.body.seed || "";
         const timestamp = Date.now() + 30 * 1000;
         const signature = crypto
             .createHmac('sha256', SECRET_KEY)
@@ -1021,6 +1030,19 @@ const verifyToken = ((req, res, next) => {
     }
 });
 
+const verifyApiToken = ((req, res, next) => {
+    if (!API_VOUCHER_TOKEN) {
+        return res.status(503).json({ message: 'API voucher token not configured' });
+    }
+
+    const token = req.headers['x-api-token'];
+    if (!token || token !== API_VOUCHER_TOKEN) {
+        return res.status(401).json({ message: 'Invalid API token' });
+    }
+
+    next();
+});
+
 app.post('/api/login', async (req, res) => {
     const { username, password } = req.body;
 
@@ -1094,6 +1116,36 @@ app.post('/api/vouchers/create', verifyToken, async (req, res) => {
             message: 'Internal server error.'
         });
     }            
+});
+
+app.post('/api/vouchers/create_from_api', verifyApiToken, async (req, res) => {
+    // const { payout, memo, supply } = req.body;
+    const rawCode = crypto.randomBytes(4).toString('hex').toUpperCase();
+    const voucherCode = `${rawCode.slice(0, 4)}-${rawCode.slice(4)}`;
+    const payout = 0.0005;
+    const memo = "Thanks for being part of our Zcash Discord community."
+    const supply = 1;
+
+    try {
+        const apiUser = await User.findOne({ where: { username: 'api' } });
+        if (!apiUser) {
+            return res.status(404).json({ message: 'API user not found' });
+        }
+
+        await apiUser.createVoucher({
+            code: voucherCode,
+            payout: payout,
+            memo: memo,
+            max_supply: supply,
+        });
+
+        res.status(200).json({ code: voucherCode });
+    }
+    catch(err) {
+        return res.status(500).json({
+            message: 'Internal server error.'
+        });
+    }
 });
 
 app.delete('/api/vouchers/delete/:id', verifyToken, async (req, res) => {

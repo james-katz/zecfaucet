@@ -10,17 +10,13 @@ ReactDOM.createRoot(document.getElementById('root')).render(
   <React.StrictMode>
     <Router>
       <Routes>
-        {/* Rota principal que usa o layout do App.jsx */}
         <Route path="/" element={<App />}>
-          {/* Rota Index (página inicial) dentro do layout */}
-          <Route index element={<HomePage />} />                    
-          {/* Rota para o Dashboard dentro do layout */}
+          <Route index element={<HomePage />} />
           <Route path="dashboard" element={<Dashboard />} />
-          {/* Rota para URLs inválidas */}
-          <Route path="*" element={<Navigate to="/" replace />} />
-          {/* Rota de testes */}
           <Route path="test" element={<HomePage />} />
-        </Route>        
+          <Route path=":voucherCode" element={<HomePage />} />
+          <Route path="*" element={<Navigate to="/" replace />} />
+        </Route>
       </Routes>
     </Router>
   </React.StrictMode>

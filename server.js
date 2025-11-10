@@ -1120,11 +1120,18 @@ app.post('/api/vouchers/create', verifyToken, async (req, res) => {
 
 app.post('/api/vouchers/create_from_api', verifyApiToken, async (req, res) => {
     // const { payout, memo, supply } = req.body;
+    const payoutId = req.body.payId;
     const rawCode = crypto.randomBytes(4).toString('hex').toUpperCase();
     const voucherCode = `${rawCode.slice(0, 4)}-${rawCode.slice(4)}`;
-    const payout = 0.0005;
-    const memo = "Thanks for being part of our Zcash Discord community."
-    const supply = 1;
+    
+    let payout = 0.0005;
+    if(payoutId == 0) payout = 0.0006;
+    else if(payoutId == 1 || payoutId == 2) payout = 0.0007;
+    else if(payoutId == 3) payout = 0.0008;
+    else if(payoutId == 4) payout = 0.0009;
+    else if(payoutId == 5) payout = 0.001;
+
+    const memo = "Thanks for being part of our Zcash Discord community."    
 
     try {
         const apiUser = await User.findOne({ where: { username: 'api' } });
@@ -1136,7 +1143,7 @@ app.post('/api/vouchers/create_from_api', verifyApiToken, async (req, res) => {
             code: voucherCode,
             payout: payout,
             memo: memo,
-            max_supply: supply,
+            max_supply: 1,
         });
 
         res.status(200).json({ code: voucherCode });

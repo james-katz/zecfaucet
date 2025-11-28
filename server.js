@@ -53,7 +53,7 @@ const memo = `Thanks for using ${network == 'test' ? 'testnet.' : ''}ZecFaucet.c
 // Queue for the faucet payout
 const waitTime = network == "main" ? 120 : 15; // Time in minuts before next claim
 const payInterval = 3; // Time in minuts between payments
-const minBlocks = 3; // Number of blocks to wait before sending payments
+const minBlocks = 4; // Number of blocks to wait before sending payments
 const scanInterval = 10; // Time in minutes to scan donations
 
 let cooldown = false;
@@ -94,8 +94,8 @@ zingo.init().then(async () => {
     const timerID = setInterval(async() => {
         const currentHeight = zingo.lastWalletBlockHeight;
         const elapsedBlocks = currentHeight - latestHeight;
-        console.log("old height", latestHeight)
-        console.log("current height", currentHeight)
+        // console.log("old height", latestHeight)
+        // console.log("current height", currentHeight)
         console.log("elapsed", elapsedBlocks)
         
         if(elapsedBlocks < minBlocks) {
@@ -266,8 +266,8 @@ app.get('/api/donate', async (req, res) => {
 });
 
 app.get('/api/balance', async (req, res) => {    
-    const bal = zingo.totalSpendableBalance / 10**8;
-    return res.send(`${bal.toFixed(8)}`);
+    const bal = zingo.totalSpendableBalance;
+    return res.send(`${bal}`);
 });
 
 app.get('/api/dashboard-stats', async (req, res) => {
@@ -288,7 +288,7 @@ app.get('/api/dashboard-stats', async (req, res) => {
         where: { kind: 'received' }
     });
 
-    const balance = zingo.totalSpendableBalance / 10**8;
+    const balance = zingo.totalSpendableBalance;
 
     const sevenDaysAgo = new Date(Date.now() - 7 * 24 * 60 * 60 * 1000);
 
@@ -710,7 +710,7 @@ app.post('/api/challenge', async (req, res) => {
             
             // Then check if faucet has enough balance
             // TODO: Move to a separete function
-            const bal = zingo.totalSpendableBalance / 10**8;
+            const bal = zingo.totalSpendableBalance;
             
             const pay = voucherIsValid.valid ? voucherIsValid.voucher.payout : u_payout;
             

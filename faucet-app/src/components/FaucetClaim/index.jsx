@@ -9,7 +9,7 @@ import SliderCaptchaBox from '../SliderCaptcha';
 
 import { useGoogleReCaptcha } from 'react-google-recaptcha-v3';
 
-export default function FaucetClaim( { applyVoucher } ) {
+export default function FaucetClaim({ applyVoucher, faucetClosed }) {
   const [userAddress, setUserAddress] = useState('');
   const [modalVisible, setModalVisible] = useState(false);
   const [challenge, setChallenge] = useState({});
@@ -177,10 +177,11 @@ export default function FaucetClaim( { applyVoucher } ) {
 
       <input
         type="text"
-        placeholder="Insert your wallet address here"
+        placeholder={faucetClosed && !voucher ? "Please enter a coupon first" : "Insert your wallet address here"}
         value={userAddress}
         onChange={handleInputChange}
         className="faucet-input"
+        disabled={faucetClosed && !voucher}
       />
       {puzzleSolved ? (
         <button onClick={handleSubmit} className="faucet-button" disabled={!canClick}>

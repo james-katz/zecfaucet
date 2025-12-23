@@ -6,11 +6,13 @@ import { Toaster } from 'react-hot-toast';
 export default function App() {
   const [faucetOffline, setFaucetOffline] = useState(false);
   const [coinName, setCoinName] = useState('');
+  const [faucetClosed, setFaucetClosed] = useState(false);
 
   useEffect(() => {    
     httpCommon.get('/network').then((res) => {
       if(res.status === 200) {
         setCoinName(res.data.net === "test" ? "TAZ" : "ZEC");
+        setFaucetClosed(Boolean(res.data.closed));
       }
     }).catch((err) => {
       console.log(err);
@@ -33,7 +35,7 @@ export default function App() {
         <>
           {/* O Outlet renderizará o componente da rota filha (HomePage ou Dashboard) */}
           <main>
-            <Outlet context={{ coinName }} /> {/* Passando coinName via context do Outlet */}
+            <Outlet context={{ coinName, faucetClosed }} /> {/* Passando coinName via context do Outlet */}
           </main>
         </>
       )}

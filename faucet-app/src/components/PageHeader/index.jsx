@@ -5,7 +5,7 @@ import FaucetClaim from '../FaucetClaim';
 import { useEffect, useState } from 'react';
 import httpCommon from '../../http-common';
 
-export default function Header({coin}) {
+export default function Header({ coin, faucetClosed }) {
   const [faucetPayout, setFaucetPayout] = useState({
     u_pay: '(Loading ...)',
     z_pay: 0,
@@ -52,8 +52,14 @@ export default function Header({coin}) {
             Welcome to<br />
             <strong>zecfaucet.com</strong>
           </h1>
-          <p>Enter your Zcash address to</p>
-          <p>receive {faucetPayout.u_pay} {coin}</p>
+          {faucetClosed ? (
+            <p>Faucet is closed, if you have a coupon, enter it by clicking the link below.</p>
+          ) : (
+            <>
+              <p>Enter your Zcash address to</p>
+              <p>receive {faucetPayout.u_pay} {coin}</p>
+            </>
+          )}
           <p className="warning">
             ZecFaucet only sends to Unified Addresses 
             <br />
@@ -76,7 +82,7 @@ export default function Header({coin}) {
           <img src={logo} alt="ZecFaucet logo" />
         </div>        
       </header>      
-      <FaucetClaim applyVoucher={setVoucher} />
+      <FaucetClaim applyVoucher={setVoucher} faucetClosed={faucetClosed} />
     </div>
   );
 }

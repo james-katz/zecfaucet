@@ -243,7 +243,8 @@ function getClientIp(req) {
 
 app.get('/api/network', (req, res) =>{
     res.json({
-        net: network
+        net: network,
+        closed: faucetClosed
     });
 });
 

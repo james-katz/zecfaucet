@@ -10,16 +10,15 @@ import { GoogleReCaptchaProvider } from 'react-google-recaptcha-v3';
 
 // Este componente representa o conteúdo da página inicial
 export default function HomePage() {
-  const { coinName } = useOutletContext();
+  const { coinName, faucetClosed } = useOutletContext();
 
   return (
     <GoogleReCaptchaProvider
       reCaptchaKey="6LckEEgrAAAAAO4sSoOtKsNtVlKFl6DyraY69LPe">
-        <PageHeader coin={coinName}/>
+        <PageHeader coin={coinName} faucetClosed={faucetClosed} />
         <DonateSection coin={coinName}/>
         <FaucetStats coin={coinName} />
         <About />
     </GoogleReCaptchaProvider>
   );
 }
-

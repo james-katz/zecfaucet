@@ -4,6 +4,7 @@ class ZkoolClient {
   constructor(endpoint, options = {}) {
     this.client = new GraphQLClient(endpoint, options);
     this.accountId = 1;
+    this.syncLock = false;
     this.syncTask = undefined;
   }
 
@@ -363,19 +364,32 @@ class ZkoolClient {
   */
   spawnSyncTask(accountId = this.accountId) {
     const syncTimer = setInterval(async () => {
-        const serverHeight = await this.getServerHeight();
-        const accHeight =  await this.getWalletHeight(accountId);
-        console.log(`Chain tip: ${serverHeight} | Wallet height: ${accHeight}`);
-        if(serverHeight > accHeight) {
-          console.log(`${serverHeight - accHeight} new blocks`);
-          this.synchronize(accountId).then(async (res) => {
-            console.log("Wallet is up to date", res);            
-          }).catch((err) => {console.log(err)});        
-        }
-        else {
-          console.log("No new blocks.");
-        }
+      if(this.syncLock) {
+        console.log("Already have a sync task running");
+        return;
+      }
+
+      this.syncLock = true;
+      
+      const serverHeight = await this.getServerHeight();
+      const accHeight =  await this.getWalletHeight(accountId);
+      console.log(`Chain tip: ${serverHeight} | Wallet height: ${accHeight}`);
+      if(serverHeight > accHeight) {
+        console.log(`${serverHeight - accHeight} new blocks`);
+        this.synchronize(accountId).then(async (res) => {
+          this.syncLock = false;
+          console.log("Wallet is up to date", res);            
+        }).catch((err) => {
+          console.log(err)
+          this.syncLock = false;
+        });        
+      }
+      else {
+        this.syncLock = false;
+        console.log("No new blocks.");
+      }
     }, 60 * 1000); 
+
     console.log("Sync task spawned.");
     return syncTimer;
   }

@@ -1,5 +1,5 @@
 const { Transaction, User, Voucher, initializeDatabase, resetDatabase } = require('./sequelize');
-const LiteWallet = require('./zingolib-wrapper/zingolib');
+const { ZkoolClient } = require('./zkool');
 
 const dotenv = require('dotenv');
 dotenv.config();
@@ -16,28 +16,35 @@ async function migrate_db() {
     const seedUser = process.env.SEED_USERNAME;
     const seedPwd = process.env.SEED_PASSWORD;
 
-    const lwd_url = process.env.LWD_URL;
-    const network = process.env.NETWORK;
+    const gql_url = process.env.GQL_URL;
+    // const network = process.env.NETWORK;
 
-    // initialize zingolib
-    const zingo = new LiteWallet(lwd_url, network, false);
-    zingo.init().then(async () => {    
+    // initialize zkool
+    const zkool = new ZkoolClient(gql_url);
+    zkool.init().then(async () => {    
         // fetch all transactions
-        const txList = await zingo.getTransactions();  
-        const allTx = txList.value_transfers;
+        const txList = await zkool.getTransactions();          
 
-        console.log(`Processing a total of ${allTx.length} transactions.`)
+        console.log(`Processing a total of ${txList.length} transactions.`)
 
-        for(const tx of allTx) {
+        for(const tx of txList) {
             const txTxid = tx.txid;
-            const txTimestamp = new Date(tx.datetime * 1000);
-            const txKind = tx.kind;
-            const txValue = tx.value;
-            const txFee = tx.fee;
+            const txTimestamp = new Date(tx.time);
+            const txKind = tx.value >= 0 ? "received" : "sent";
+            const txValue = Math.abs(tx.value);
+            const txFee = tx.fee;                         
+            let txMemo = "No memo available";
+            
+            const txDetails = await zkool.getTransactionInfo(1, txTxid);
 
-            let txMemo = "No memo available";                            
-            if(tx.memos && tx.memos.length > 0) txMemo = tx.memos[0];
-
+            if(txKind === "received") {                
+                if(txDetails.notes &&
+                    txDetails.notes.length > 0 &&
+                    txDetails.notes[0].memo) {
+                        txMemo = txDetails.notes[0].memo;
+                }                
+            }
+            
             const txDb = await Transaction.create({
                 txid: txTxid,
                 kind: txKind,
@@ -46,20 +53,20 @@ async function migrate_db() {
                 memo: txMemo,
                 createdAt: txTimestamp
             });
-            
-            if(txKind == "sent") {
-                // const txClaims = tx.outgoing_tx_data;
-                // for(const claim of txClaims) {
+
+            if(txKind === "sent") {
+                const txClaims = txDetails.outputs;
+                for(const claim of txClaims) {
                     await txDb.createClaim({
-                        address: tx.recipient_address,
+                        address: claim.address,
                         ip: '0.0.0.0',
                         pending: false,
                         createdAt: txTimestamp
                     });
-                // }
+                }
             }
         }
-
+              
         await User.create({
             username: seedUser,
             password: seedPwd

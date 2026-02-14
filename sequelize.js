@@ -16,7 +16,7 @@ const Transaction = sequelize.define('transaction', {
         // unique: true,
     },
     value: {
-        type: DataTypes.BIGINT,
+        type: DataTypes.FLOAT,
         allowNull: false
     },
     fee: {

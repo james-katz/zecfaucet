@@ -131,14 +131,14 @@ zkool.init().then(async () => {
             
             zkool.sendTransaction(1, sendJson).then(async (tx)=>{
             // fakeSendTransaction(sendJson).then(async (txid)=>{                               
-                console.log(txid);
+                console.log(tx);
                 
                 const totalValue = sendJson.map((el) => el.amount).reduce((acc, curr) => acc + curr, 0);
                 // console.log(totalValue)
                 try {
                     // add Transaction and claims to database
                     const newTx = await Transaction.create({
-                        txid: txid.txid,
+                        txid: tx.pay,
                         kind: 'sent',
                         value: totalValue,
                         fee: 0.000005 * (1 + queue.length),
@@ -612,7 +612,7 @@ app.post('/api/challenge', async (req, res) => {
     let reScore = 1.0;
 
     // const parsedAddr = await zingo.parseAddress(userAddr);
-    let validAddr = true;
+    let validAddr = userAddr.toLowerCase().startsWith("u1");
     // if(network == "test") {
     //     validAddr = parsedAddr && parsedAddr.chain_name == network;
     // }

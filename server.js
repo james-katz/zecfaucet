@@ -46,9 +46,9 @@ const app = express();
 const port = 2653;
 
 // Set faucet payout in decimal ZEC (Mainnet / Testenet)
-const u_payout = network == "main" ? 0.0005 : 0.3;
-const z_payout = network == "main" ? 0.0004 : 0.2;
-const t_payout = network == "main" ? 0.0003 : 0.1;
+const u_payout = network == "main" ? 0.0005 : 1.0;
+const z_payout = network == "main" ? 0.0004 : 1.0;
+const t_payout = network == "main" ? 0.0003 : 1.0;
 
 const memo = `Thanks for using ${network == 'test' ? 'testnet.' : ''}ZecFaucet.com`;
 
@@ -83,43 +83,43 @@ const fakeSendTransaction = (foo) => {
 }
 
 // Initialize Zkool Client
-zkool.init().then(async () => {    
+zkool.init().then(async () => {
     //initialize the database
     await initializeDatabase();
 
     latestHeight = await zkool.getWalletHeight();
-    
+
     // Send payments every `payInterval` minutes
-    const timerID = setInterval(async() => {
+    const timerID = setInterval(async () => {
         const currentHeight = await zkool.getWalletHeight();
-        const elapsedBlocks = currentHeight - latestHeight;        
-        
-        if(elapsedBlocks < minBlocks) {
+        const elapsedBlocks = currentHeight - latestHeight;
+
+        if (elapsedBlocks < minBlocks) {
             console.log(`Awaiting ${minBlocks - elapsedBlocks} more blocks before sending payments ...`);
             return;
         }
 
         latestHeight = currentHeight;
-        
+
         const queue = await Claim.findAll({
             where: {
                 pending: true
             }
         });
-        
+
         console.log(`Queue: ${queue.length} | Synclock: TODO`);
-        if(queue.length > 0) {
+        if (queue.length > 0) {
             const sendJson = (
                 await Promise.all(queue.map(async (q) => {
                     let sendAmount = u_payout;
                     let sendMemo = memo;
-                    
-                    const voucher = await Voucher.findOne({ where: { id: q.voucherId} } );
-                    if(voucher) {                                            
+
+                    const voucher = await Voucher.findOne({ where: { id: q.voucherId } });
+                    if (voucher) {
                         sendAmount = voucher.payout;
                         sendMemo = voucher.memo;
                     }
-                      
+
                     return {
                         address: q.address,
                         amount: sendAmount,
@@ -127,12 +127,12 @@ zkool.init().then(async () => {
                     }
                 }))
             ).flat();
-            // console.log(sendJson);            
-            
-            zkool.sendTransaction(1, sendJson).then(async (tx)=>{
-            // fakeSendTransaction(sendJson).then(async (txid)=>{                               
+            // console.log(sendJson);
+
+            zkool.sendTransaction(zkool.accountId, sendJson).then(async (tx) => {
+                // fakeSendTransaction(sendJson).then(async (txid)=>{                               
                 console.log(tx);
-                
+
                 const totalValue = sendJson.map((el) => el.amount).reduce((acc, curr) => acc + curr, 0);
                 // console.log(totalValue)
                 try {
@@ -144,14 +144,14 @@ zkool.init().then(async () => {
                         fee: 0.000005 * (1 + queue.length),
                         memo: memo
                     });
-                    
-                    for(const claim of queue) {
+
+                    for (const claim of queue) {
                         claim.pending = false;
-                        claim.transactionTxid = newTx.txid;                        
+                        claim.transactionTxid = newTx.txid;
                         await claim.save();
                     }
                 }
-                catch(err) {
+                catch (err) {
                     console.log("Couldn't add new tx to database");
                     // console.log(err);
                 }
@@ -159,12 +159,12 @@ zkool.init().then(async () => {
                 console.log(err);
                 // process.kill(process.pid, "SIGINT");
             });
-        }  
-    }, payInterval * 60 * 1000);    
-    
+        }
+    }, payInterval * 60 * 1000);
+
     // Check new donations
-    const donationsTimerId = setInterval(async () => { 
-       const lastDbTxid = await Transaction.findAll({
+    const donationsTimerId = setInterval(async () => {
+        const lastDbTxid = await Transaction.findAll({
             where: { kind: 'received' },
             order: [['createdAt', 'DESC']],
             limit: 1
@@ -174,51 +174,51 @@ zkool.init().then(async () => {
 
         // console.log("db txid:", lastDbTxid[0].txid);
         // console.log("wallet txid:", lastTxid.txid);
-        
-        if(lastTxid && lastDbTxid[0] && lastDbTxid[0].txid && lastDbTxid[0].txid != lastTxid.txid) {                               
+
+        if (lastTxid && lastDbTxid[0] && lastDbTxid[0].txid && lastDbTxid[0].txid != lastTxid.txid) {
             console.log("Will start looking for new  donations ...")
-            zkool.getTransactions().then(async (txList) => {                
+            zkool.getTransactions().then(async (txList) => {
                 let count = 0;
-                for(const tx of txList) {
-                    if(tx.txid == lastDbTxid[0].txid) {
+                for (const tx of txList) {
+                    if (tx.txid == lastDbTxid[0].txid) {
                         console.log(`Done looking for donations, received a total of ${count} donations.`);
                         break;
                     }
-                    
+
                     const txKind = tx.value >= 0 ? "received" : "sent";
-                    
-                    if(txKind == 'received') {
-                        try {                    
+
+                    if (txKind == 'received') {
+                        try {
                             const txTimestamp = new Date(tx.time);
 
                             let txMemo = "No memo available";
                             const txDetails = await zkool.getTransactionInfo(1, tx.txid);
                             // console.log(txDetails)
-                            if(txDetails.notes &&
+                            if (txDetails.notes &&
                                 txDetails.notes.length > 0 &&
                                 txDetails.notes[0].memo) {
-                                    txMemo = txDetails.notes[0].memo;
+                                txMemo = txDetails.notes[0].memo;
                             }
 
                             await Transaction.create({
                                 txid: tx.txid,
                                 kind: txKind,
-                                value: Math.abs(tx.value),                            
+                                value: Math.abs(tx.value),
                                 memo: txMemo,
                                 createdAt: txTimestamp
                             });
                             console.log(`New donation of ${tx.value} received!\nMessage: ${txMemo}`);
                         }
-                        catch(e) {
+                        catch (e) {
                             console.log("Couldn't insert donation into db ...", e);
                         }
-                        count ++;
+                        count++;
                     }
                 }
             }).catch(e => { console.log(e) });
         }
         else {
-            console.log("No new donation");           
+            console.log("No new donation");
         }
     }, scanInterval * 60 * 1000);
 }).catch((err) => { console.log(err) });
@@ -232,16 +232,16 @@ function getClientIp(req) {
     return req.ip; // Fallback to req.ip if no x-forwarded-for header
 };
 
-app.get('/api/network', (req, res) =>{
+app.get('/api/network', (req, res) => {
     res.json({
         net: network,
         closed: faucetClosed
     });
 });
 
-app.get('/api/payout', async(req, res) =>{    
+app.get('/api/payout', async (req, res) => {
     const voucherIsValid = await checkValidVoucher(req.query.voucher);
-    
+
     res.json({
         status: 200,
         payout: {
@@ -252,14 +252,14 @@ app.get('/api/payout', async(req, res) =>{
     });
 });
 
-app.get('/api/donate', async (req, res) => {    
+app.get('/api/donate', async (req, res) => {
     const addr = await zkool.getAddress();
     res.send(addr.ua);
 });
 
-app.get('/api/balance', async (req, res) => {    
+app.get('/api/balance', async (req, res) => {
     const bal = await zkool.getTotalBalance();
-    return res.send(parseFloat(bal.total));
+    return res.send(`${bal.total} ${network === 'main' ? 'ZEC' : 'TAZ'}`);
 });
 
 app.get('/api/dashboard-stats', async (req, res) => {
@@ -275,7 +275,7 @@ app.get('/api/dashboard-stats', async (req, res) => {
     const totalSent = await Transaction.sum('value', {
         where: { kind: 'sent' }
     });
-    
+
     const totalClaims = await Claim.count();
     const totalReceived = await Transaction.sum('value', {
         where: { kind: 'received' }
@@ -319,20 +319,20 @@ app.get('/api/dashboard-stats', async (req, res) => {
 
 app.get('/api/txns', async (req, res) => {
     const topDonations = await Transaction.findAll({
-        where: { 
-            kind: 'received',            
-         },
+        where: {
+            kind: 'received',
+        },
         order: [['value', 'DESC']],
         limit: 3
     });
 
     const recentDonations = await Transaction.findAll({
-        where: { 
+        where: {
             kind: 'received',
             value: {
                 [Op.gte]: 0.0005
             }
-         },
+        },
         order: [['createdAt', 'DESC']],
         limit: 7
     });
@@ -350,14 +350,14 @@ app.get('/api/txns', async (req, res) => {
             value: (el.value),
             time: el.createdAt,
             memo: el.memo
-        });  
+        });
     });
     recentDonations.forEach((el) => {
         donationsJson.push({
             value: (el.value),
             time: el.createdAt,
             memo: el.memo
-        });  
+        });
     });
 
     res.json(donationsJson);
@@ -377,9 +377,9 @@ app.get('/api/stats', async (req, res) => {
     res.json(result);
 });
 
-app.get('/api/voucher', async (req, res) => { 
+app.get('/api/voucher', async (req, res) => {
     const voucher = await checkValidVoucher(req.query.code);
-    if(voucher.valid) {
+    if (voucher.valid) {
         return res.json({
             status: 200,
             message: voucher.hint,
@@ -396,7 +396,7 @@ app.get('/api/voucher', async (req, res) => {
 const canClaim = async (address, ip) => {
     // Check if user awaited `waitTime` (even if user is still in the queue)
     const cutoffTime = new Date(Date.now() - waitTime * 60 * 1000);
-    
+
     let sequentialIp = '';
     const parts = ip.split('.');
     if (parts.length < 4) {
@@ -412,28 +412,28 @@ const canClaim = async (address, ip) => {
                 { address },
                 { ip },
                 {
-                  ip: {
-                    [Op.like]: sequentialIp
-                  }
+                    ip: {
+                        [Op.like]: sequentialIp
+                    }
                 }
             ],
             createdAt: {
-            [Op.gte]: cutoffTime
-        }
-    },
+                [Op.gte]: cutoffTime
+            }
+        },
         order: [['createdAt', 'DESC']]
     });
-    
+
     if (!recentClaim) {
         return { allowed: true };
     }
-  
+
     const now = new Date();
     const claimTime = new Date(recentClaim.createdAt);
     const elapsedMs = now - claimTime;
     const elapsedMinutes = elapsedMs / 60000;
     const remainingMinutes = Math.ceil(waitTime - elapsedMinutes);
-  
+
     console.log(`greedy user`);
 
     return {
@@ -442,13 +442,13 @@ const canClaim = async (address, ip) => {
     };
 };
 
-const checkValidVoucher = async (voucherCode) => {        
-    try {        
-        const voucher = await Voucher.findOne({where: { code: voucherCode ? voucherCode.toUpperCase() : ''} });
-        if(voucher) {
+const checkValidVoucher = async (voucherCode) => {
+    try {
+        const voucher = await Voucher.findOne({ where: { code: voucherCode ? voucherCode.toUpperCase() : '' } });
+        if (voucher) {
             const usageCount = await Claim.count({
                 where: {
-                  voucherId: voucher.id
+                    voucherId: voucher.id
                 }
             });
 
@@ -466,10 +466,10 @@ const checkValidVoucher = async (voucherCode) => {
             };
         }
         else {
-            throw(`Voucher not found: ${voucherCode}`)
+            throw (`Voucher not found: ${voucherCode}`)
         }
     }
-    catch(err) {
+    catch (err) {
         // console.log(err);
         return {
             valid: false,
@@ -480,14 +480,14 @@ const checkValidVoucher = async (voucherCode) => {
 
 const checkValidPoW = async (token, userIp) => {
     const nonce = token.nonce;
-    
+
     const hashMessage = (input) => {
         const hash = crypto.createHash('sha256');
         hash.update(input);
         const hashArray = new Uint8Array(hash.digest());
         return Array.from(new Uint8Array(hashArray)).map(b => b.toString(16).padStart(2, '0')).join('');
-    };        
-    
+    };
+
     let message;
     let minZeros = '0'.repeat(4);
 
@@ -502,7 +502,7 @@ const checkValidPoW = async (token, userIp) => {
             diff = challenge.difficulty;
 
             const userIpChallenge = message.split('-')[1];
-    
+
             // Block if user took too long to verify
             const challengeTimestamp = new Date(challenge.createdAt);
             const now = new Date();
@@ -513,7 +513,7 @@ const checkValidPoW = async (token, userIp) => {
             }
 
             // Block if IP address changed.
-            if(userIpChallenge != userIp) {
+            if (userIpChallenge != userIp) {
                 console.log(`IP mismatch. Claim was blocked for challenge ${challenge.id}!`);
                 await challenge.destroy();
                 return false;
@@ -525,19 +525,19 @@ const checkValidPoW = async (token, userIp) => {
             const hashesMatch = hash == token.hash;
             const hasMinZeros = hash.startsWith(minZeros);
 
-            if(hashesMatch && hasMinZeros) {
+            if (hashesMatch && hasMinZeros) {
                 console.log(`Valid solution for proof of work for challenge id ${challenge.id}!`);
                 await challenge.destroy();
                 return true;
             }
             else {
-                console.log(`Wrong hash for challenge id ${challenge.id}`);                
+                console.log(`Wrong hash for challenge id ${challenge.id}`);
                 await challenge.destroy();
                 return false;
             }
-        }       
+        }
     }
-    catch(err) {
+    catch (err) {
         console.log(err);
         return false;
     }
@@ -556,13 +556,13 @@ app.post('/api/challenge', async (req, res) => {
 
     // Is slider captcha solved?
     const userPuzzle = store.get(puzzleId);
-    if(userPuzzle && userPuzzle.solved) {
-        console.log("Slider was completed!"); 
+    if (userPuzzle && userPuzzle.solved) {
+        console.log("Slider was completed!");
         // Also check id signature
         const userSig = puzzleId.split(".");
-        
-        if(userSig && userSig[1]) {
-            if(Number(userSig[1]) < Date.now()) {
+
+        if (userSig && userSig[1]) {
+            if (Number(userSig[1]) < Date.now()) {
                 console.log("Too slow to claim");
                 store.delete(puzzleId);
                 return res.send({
@@ -575,7 +575,7 @@ app.post('/api/challenge', async (req, res) => {
                 .createHmac('sha256', SECRET_KEY)
                 .update(`${userSig[1]}-${puzzleSeed}`)
                 .digest('base64url');
-            if(signature === userSig[0]) {
+            if (signature === userSig[0]) {
                 console.log("Correct signature");
             }
             else {
@@ -587,19 +587,19 @@ app.post('/api/challenge', async (req, res) => {
                 });
             }
         }
-              
+
         store.delete(puzzleId);
     }
     else {
-        console.log("Slider was bypassed!");       
+        console.log("Slider was bypassed!");
         return res.send({
             status: 403,
             message: `Sorry, we couldn't verify you're not a robot.`
-        }); 
+        });
     }
 
-    // CHeck if faucet is closed for voucher holderd
-    if(faucetClosed && !voucherIsValid.valid) {
+    // CHeck if faucet is closed for voucher holders
+    if (faucetClosed && !voucherIsValid.valid) {
         console.log("User without a voucher.");
         return res.send({
             status: 403,
@@ -607,29 +607,30 @@ app.post('/api/challenge', async (req, res) => {
         });
     }
 
-    const userIp = getClientIp(req);    
+    const userIp = getClientIp(req);
     let isVpn = false;
     let reScore = 1.0;
 
-    // const parsedAddr = await zingo.parseAddress(userAddr);
-    let validAddr = userAddr.toLowerCase().startsWith("u1");
-    // if(network == "test") {
-    //     validAddr = parsedAddr && parsedAddr.chain_name == network;
-    // }
-    // else {
-    //     validAddr = parsedAddr && parsedAddr.chain_name == network && parsedAddr.address_kind == "unified";
-    // }
-    if(validAddr) {
+    const validAddr = () => {
+        if (network == "main") {
+            return userAddr.toLowerCase().startsWith("u1");
+        }
+        else {
+            return userAddr.toLowerCase().startsWith("utest1");
+        }
+    }
+
+    if (validAddr()) {
         const userCanClaim = await canClaim(userAddr, userIp);
         if (userCanClaim.allowed) {
             // Check if user is using proxy/vpn,            
-            try {        
+            try {
                 const ipAddress = userIp.match(/(\d{1,3}\.\d{1,3}\.\d{1,3}\.\d{1,3})$/)[0];
                 const blacklisted = ['RU', 'ID', 'IN', 'VN', 'BG', 'RO'];
 
                 // geolocation log
                 const geo = await axios.get(`http://ip-api.com/json/${ipAddress}`);
-                if(geo.data && geo.data.status == "success") {
+                if (geo.data && geo.data.status == "success") {
                     const country = geo.data.country;
                     const regionName = geo.data.regionName;
                     const code = geo.data.countryCode;
@@ -637,8 +638,8 @@ app.post('/api/challenge', async (req, res) => {
                     if (blacklisted.includes(code)) {
                         console.log(`Blocked region detected: ${country} (${code})`);
                         return res.status(403).send({
-                        status: 403,
-                        message: `ZecFaucet is temporarily unavailable. Please try again later.`
+                            status: 403,
+                            message: `ZecFaucet is temporarily unavailable. Please try again later.`
                         });
                     }
                     console.log(`Country: ${country} | Region: ${regionName}`);
@@ -652,8 +653,8 @@ app.post('/api/challenge', async (req, res) => {
                 params.append('secret', reCaptchaKey);
                 params.append('response', reCaptchaToken);
                 params.append('remoteip', ipAddress);
-                const captcha = await axios.post("https://www.google.com/recaptcha/api/siteverify", params);                
-                if(captcha.data.success && captcha.data.action == 'claim') {
+                const captcha = await axios.post("https://www.google.com/recaptcha/api/siteverify", params);
+                if (captcha.data.success && captcha.data.action == 'claim') {
                     reScore = captcha.data.score;
                     console.log(`User has a reCaptcha score of ${reScore}`);
                     // console.log(captcha.data)
@@ -662,7 +663,7 @@ app.post('/api/challenge', async (req, res) => {
                         return res.send({
                             status: 403,
                             message: `Sorry, we couldn't verify you're not a robot.`
-                        });                        
+                        });
                     }
                 }
                 else {
@@ -670,22 +671,22 @@ app.post('/api/challenge', async (req, res) => {
                     return res.send({
                         status: 403,
                         message: `Sorry, we couldn't verify you're not a robot.`
-                    });                    
+                    });
                 }
 
-                if(checkVpn) {
+                if (checkVpn) {
                     const proxyOrVpn = await axios.get(`http://check.getipintel.net/check.php?ip=${ipAddress}&contact=james.j.katz@protonmail.com`);
-                    if(proxyOrVpn && proxyOrVpn.data > 0.90) {
+                    if (proxyOrVpn && proxyOrVpn.data > 0.90) {
                         console.log("VPN/Proxy detected.");
-                        
+
                         // if(blockVpn && voucherIsValid.valid) {
                         //     return res.send({
                         //         status: 403,
                         //         message: `Please disable your VPN in order to use this coupon.`
                         //     });
                         // }
-                                                
-                        if(blockVpn) {
+
+                        if (blockVpn) {
                             return res.send({
                                 status: 403,
                                 message: `Sorry, we couldn't verify you're not a robot.`
@@ -693,27 +694,27 @@ app.post('/api/challenge', async (req, res) => {
                         }
                         isVpn = true;
                     }
-                }              
+                }
             }
-            catch(err) {                
+            catch (err) {
                 console.log("Couldn't check user reCaptcha score or ip for proxy or vpn.");
             }
-            
+
             // Then check if faucet has enough balance
             // TODO: Move to a separete function
             const bal = await zkool.getTotalBalance();
-            
+
             const pay = voucherIsValid.valid ? voucherIsValid.voucher.payout : u_payout;
-            
+
             const queue = await Claim.findAll({
                 where: {
                     pending: true
                 }
             });
-      
+
             // TODO improve this
-            const queueSum = queue.length * u_payout;                
-                
+            const queueSum = queue.length * u_payout;
+
             const vouchers = await Voucher.findAll({ raw: true });
 
             let reservedBalance = 0;
@@ -727,28 +728,28 @@ app.post('/api/challenge', async (req, res) => {
                 reservedBalance += remaining * voucher.payout;
             }
 
-            
+
             console.log(`Faucet balance: ${bal.total}, Reserved balance: ${reservedBalance}, Queue sum: ${queueSum}, trying to add ${pay} to the queue`);
 
             const safeMargin = 0.0; //0.005;
-            
-            if(!voucherIsValid.valid && bal.total - (queueSum + pay) < reservedBalance + safeMargin) {
+
+            if (!voucherIsValid.valid && bal.total - (queueSum + pay) < reservedBalance + safeMargin) {
                 console.log("Balance is reserved for couponns holders.")
                 return res.send({
                     status: 503,
                     message: `The faucet balance is reserved for coupon holders.`
-                });                
+                });
             }
 
-            if(bal.total - safeMargin < queueSum + pay) {
+            if (bal.total - safeMargin < queueSum + pay) {
                 return res.send({
                     status: 503,
                     message: `It looks like the faucet wallet don't have enough funds 🥹`
-                });                
+                });
             }
-            
+
             // If everything is ok, send the challenge to the user            
-            try {  
+            try {
                 // Get faucet claims in the last hour
                 let claimsPerHour = await Claim.count({
                     where: {
@@ -759,12 +760,12 @@ app.post('/api/challenge', async (req, res) => {
                     }
                 });
                 console.log(`Faucet claims/hour: ${claimsPerHour}`);
-                
-                if(claimsPerHour >= 8 || queue.length >= 3) cooldown = true;
-                if(claimsPerHour <= 3) cooldown = false;
+
+                if (claimsPerHour >= 8 || queue.length >= 3) cooldown = true;
+                if (claimsPerHour <= 3) cooldown = false;
 
                 // Global cooldown
-                if(!voucherIsValid.valid && cooldown) {
+                if (!voucherIsValid.valid && cooldown) {
                     console.log("Cooldown active");
                     return res.send({
                         status: 503,
@@ -778,7 +779,7 @@ app.post('/api/challenge', async (req, res) => {
 
                 // const reScoreCapped = Math.max(0.3, Math.min(1.0, reScore));
                 // baseDiff += Math.round(((1.0 - reScoreCapped) / 0.7) * 3);
-                
+
                 // Get the total user claims (wallet address or IP)
                 let userClaimCount = await Claim.count({
                     where: {
@@ -790,12 +791,12 @@ app.post('/api/challenge', async (req, res) => {
                 });
                 const extraZeros = Math.floor(userClaimCount / 20);
                 const finalDiff = baseDiff + extraZeros;
-                               
+
                 const now = new Date().toLocaleTimeString('en-US').replace(/\s/g, '-');
-                const msg = `${userAddr}-${userIp}-${now}` ;
+                const msg = `${userAddr}-${userIp}-${now}`;
                 const challenge = await Challenge.create({
                     message: msg,
-                    difficulty: finalDiff,                    
+                    difficulty: finalDiff,
                 });
 
                 console.log(`New challenge: id: ${challenge.id}, difficulty: ${finalDiff}`);
@@ -810,14 +811,14 @@ app.post('/api/challenge', async (req, res) => {
                     }
                 });
             }
-            catch(err) {
+            catch (err) {
                 console.log(err);
                 res.json({
                     status: 500,
                     message: `Internal server error.`,
                 });
                 return;
-            }            
+            }
         }
         else {
             res.send({
@@ -825,7 +826,7 @@ app.post('/api/challenge', async (req, res) => {
                 message: `Please wait ${userCanClaim.remaining} minutes before claiming again.`
             });
             return;
-        }        
+        }
     }
     else {
         res.send({
@@ -835,7 +836,7 @@ app.post('/api/challenge', async (req, res) => {
     }
 });
 
-app.post('/api/captcha/start', async (req, res) => {    
+app.post('/api/captcha/start', async (req, res) => {
     try {
         const seed = req.body.seed || "";
         const timestamp = Date.now() + 30 * 1000;
@@ -845,10 +846,10 @@ app.post('/api/captcha/start', async (req, res) => {
             .digest('base64url');
         const id = `${signature}.${timestamp}`;
         // console.log(id);
-        
+
         const bgList = [
-            "bg1.png", 
-            "bg2.png", 
+            "bg1.png",
+            "bg2.png",
             "bg3.png",
             "bg4.png",
             "bg5.png",
@@ -864,11 +865,11 @@ app.post('/api/captcha/start', async (req, res) => {
             // const a = Math.random().toFixed(2); // alpha between 0.00 and 1.00
             const a = 0.7;
             return `rgba(${r},${g},${b},${a})`;
-        } 
+        }
 
         const { bg, puzzle, x, y } = await createPuzzle(imgBuf, {
             width: 60,
-            height: 60,            
+            height: 60,
             borderColor: `${randomRGBA()}`,
             fillColor: `${randomRGBA()}`,
             bgWidth: BG_WIDTH,
@@ -876,13 +877,13 @@ app.post('/api/captcha/start', async (req, res) => {
             imageWidth: BG_WIDTH,
             imageHeight: BG_HEIGHT,
             format: 'png',
-            bgFormat: 'jpeg',            
+            bgFormat: 'jpeg',
         });
-        
+
         // Check if id already exist somehow
         const row = store.get(id);
-        if (row) throw("id_exist");
-        
+        if (row) throw ("id_exist");
+
         store.set(id, { x, y, expiresAt: timestamp, seed });
 
         return res.json({
@@ -891,17 +892,17 @@ app.post('/api/captcha/start', async (req, res) => {
             puzzleUrl: `data:png;base64,${puzzle.toString('base64')}`,
         });
     }
-    catch(err) {
+    catch (err) {
         console.log(err)
         res.status(500).json({ error: 'captcha_init_failed' });
     }
 });
 
-app.post('/api/captcha/verify', async (req, res) => { 
-    try {        
+app.post('/api/captcha/verify', async (req, res) => {
+    try {
         const { id } = req.body;
         const row = store.get(id);
-        if (!row) return res.json({ success: false, reason: 'not_found' });            
+        if (!row) return res.json({ success: false, reason: 'not_found' });
         if (row.expiresAt < new Date()) {
             console.log("Expired puzzle");
             store.delete(id);
@@ -909,7 +910,7 @@ app.post('/api/captcha/verify', async (req, res) => {
         }
 
         const verdict = verifySlider(row, req.body);
-        
+
         if (!verdict.ok) {
             console.log(verdict.reason);
             // console.log(verdict.meta);
@@ -918,7 +919,7 @@ app.post('/api/captcha/verify', async (req, res) => {
         }
 
         store.set(id, { solved: true });
-        
+
         return res.json({ success: true });
     } catch (e) {
         console.error(e);
@@ -956,9 +957,9 @@ app.post('/api/add', async (req, res) => {
     const token = req.body.token;
     const tokenIsValid = await checkValidPoW(token, userIp);
     const voucherIsValid = await checkValidVoucher(token.voucher);
-    
+
     const userCanClaim = await canClaim(userAddr, userIp);
-    if(!userCanClaim.allowed) {
+    if (!userCanClaim.allowed) {
         console.log("Double claim blocked!");
         return res.send({
             status: 403,
@@ -966,8 +967,8 @@ app.post('/api/add', async (req, res) => {
         });
     }
 
-    if(tokenIsValid && userIp) {                        
-        if(voucherIsValid.valid) {
+    if (tokenIsValid && userIp) {
+        if (voucherIsValid.valid) {
             console.log(`Using voucher ${voucherIsValid.voucher.code}`);
         }
 
@@ -979,7 +980,7 @@ app.post('/api/add', async (req, res) => {
                 voucherId: voucherIsValid.valid ? voucherIsValid.voucher.id : null
             });
         }
-        catch(err) {
+        catch (err) {
             console.log(err);
             res.json({
                 status: 500,
@@ -1037,63 +1038,63 @@ const verifyApiToken = ((req, res, next) => {
 app.post('/api/login', async (req, res) => {
     const { username, password } = req.body;
 
-    const dbUser = await User.findOne({where:{username: username}});
+    const dbUser = await User.findOne({ where: { username: username } });
 
     if (username === dbUser.username && password === dbUser.password) {
         console.log(`Correct credentials!`);
         const token = jwt.sign({ userId: dbUser.id }, SECRET_KEY, { expiresIn: '3h' });
-        return res.json({ 
+        return res.json({
             username: dbUser.username,
             userId: dbUser.id,
-            token: token 
+            token: token
         });
     }
-  
+
     res.status(401).json({ message: 'Invalid credentials' });
 });
 
 // Voucher routes
 app.get('/api/vouchers', verifyToken, async (req, res) => {
-    try {        
+    try {
         const vouchers = await Voucher.findAll({
             attributes: {
-              include: [
-                [Sequelize.fn('COUNT', Sequelize.col('claims.id')), 'usageCount']
-              ]
+                include: [
+                    [Sequelize.fn('COUNT', Sequelize.col('claims.id')), 'usageCount']
+                ]
             },
             include: [
-              {
-                model: Claim,
-                attributes: [], // Just for counting usage
-              },
-              {
-                model: User,
-                attributes: ['username'] // or whatever field you want from the User
-              }
+                {
+                    model: Claim,
+                    attributes: [], // Just for counting usage
+                },
+                {
+                    model: User,
+                    attributes: ['username'] // or whatever field you want from the User
+                }
             ],
             group: ['voucher.id', 'user.id'], // Important: group by both voucher and user
             order: [['createdAt', 'DESC']]
         });
-        if(req.user.userId > 1) {
-            return res.json(vouchers.filter((v) => v.userId === req.user.userId ));
+        if (req.user.userId > 1) {
+            return res.json(vouchers.filter((v) => v.userId === req.user.userId));
         }
         res.json(vouchers);
     }
-    catch(err) {
+    catch (err) {
         // console.log(err);
-        res.status(500).json({            
+        res.status(500).json({
             message: 'Internal server error.'
         });
-    }            
+    }
 });
 
 app.post('/api/vouchers/create', verifyToken, async (req, res) => {
     const data = req.body;
-    
-    try {        
-        const user = await User.findOne({where: {id: req.user.userId}});
+
+    try {
+        const user = await User.findOne({ where: { id: req.user.userId } });
         await user.createVoucher({
-            code: data.code.toUpperCase(),            
+            code: data.code.toUpperCase(),
             payout: data.payout,
             memo: data.memo,
             max_supply: data.supply,
@@ -1101,12 +1102,12 @@ app.post('/api/vouchers/create', verifyToken, async (req, res) => {
 
         res.status(200).send();
     }
-    catch(err) {
+    catch (err) {
         // console.log(err)
-        return res.status(500).json({            
+        return res.status(500).json({
             message: 'Internal server error.'
         });
-    }            
+    }
 });
 
 app.post('/api/vouchers/create_from_api', verifyApiToken, async (req, res) => {
@@ -1114,15 +1115,15 @@ app.post('/api/vouchers/create_from_api', verifyApiToken, async (req, res) => {
     const payoutId = req.body.payId;
     const rawCode = crypto.randomBytes(4).toString('hex').toUpperCase();
     const voucherCode = `${rawCode.slice(0, 4)}-${rawCode.slice(4)}`;
-    
-    let payout = 0.0005;
-    if(payoutId == 0) payout = 0.0006;
-    else if(payoutId == 1 || payoutId == 2) payout = 0.0007;
-    else if(payoutId == 3) payout = 0.0008;
-    else if(payoutId == 4) payout = 0.0009;
-    else if(payoutId == 5) payout = 0.001;
 
-    const memo = "Thanks for being part of our Zcash Discord community."    
+    let payout = 0.0005;
+    if (payoutId == 0) payout = 0.0006;
+    else if (payoutId == 1 || payoutId == 2) payout = 0.0007;
+    else if (payoutId == 3) payout = 0.0008;
+    else if (payoutId == 4) payout = 0.0009;
+    else if (payoutId == 5) payout = 0.001;
+
+    const memo = "Thanks for being part of our Zcash Discord community."
 
     try {
         const apiUser = await User.findOne({ where: { username: 'api' } });
@@ -1139,7 +1140,7 @@ app.post('/api/vouchers/create_from_api', verifyApiToken, async (req, res) => {
 
         res.status(200).json({ code: voucherCode });
     }
-    catch(err) {
+    catch (err) {
         return res.status(500).json({
             message: 'Internal server error.'
         });
@@ -1148,20 +1149,20 @@ app.post('/api/vouchers/create_from_api', verifyApiToken, async (req, res) => {
 
 app.delete('/api/vouchers/delete/:id', verifyToken, async (req, res) => {
     const voucherId = req.params.id;
-    
+
     try {
-        await Voucher.destroy({where: {id: voucherId}});
+        await Voucher.destroy({ where: { id: voucherId } });
         res.status(200).send();
     }
-    catch(err) {
+    catch (err) {
         // console.log(err);
-        res.status(500).json({            
+        res.status(500).json({
             message: 'Internal server error.'
         });
-    }            
+    }
 });
 
-app.put('/api/vouchers/update', verifyToken, async (req, res) => {    
+app.put('/api/vouchers/update', verifyToken, async (req, res) => {
     const newValues = req.body;
 
     try {
@@ -1171,20 +1172,21 @@ app.put('/api/vouchers/update', verifyToken, async (req, res) => {
                 memo: newValues.memo,
                 max_supply: newValues.maxSupply
             },
-            {where: {id: newValues.voucherId}
-        });
+            {
+                where: { id: newValues.voucherId }
+            });
         res.status(200).send();
     }
-    catch(err) {
+    catch (err) {
         // console.log(err);
-        res.status(500).json({            
+        res.status(500).json({
             message: 'Internal server error.'
         });
-    }            
+    }
 });
 
 
-if(useHttps) {
+if (useHttps) {
     const options = {
         key: fs.readFileSync('privkey.pem'),
         cert: fs.readFileSync('cert.pem')
@@ -1199,7 +1201,7 @@ else {
 }
 
 process.on('SIGINT', async () => {
-    console.log("Safely shutdown zingolib");    
+    console.log("Safely shutdown Zkool server...");
     // await zingo.deinitialize();
     process.exit();
 });

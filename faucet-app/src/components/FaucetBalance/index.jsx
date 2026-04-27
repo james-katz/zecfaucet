@@ -37,7 +37,8 @@ export default function DonateSection({ coin }) {
     const updateBalance = () => {
       httpCommon.get('/balance').then(res => {
         if (res.status == 200) {        
-          setBalance(`${res.data} ${coin}`);
+          // setBalance(`${res.data} ${coin}`);
+          setBalance(`${res.data}`);
         }      
       }).catch((err) => { console.log(err) });    
     }

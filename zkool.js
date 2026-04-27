@@ -6,18 +6,100 @@ class ZkoolClient {
     this.accountId = 1;
     this.syncLock = false;
     this.syncTask = undefined;
+    this.isSending = false;
+    this.syncIntervalMs = 60 * 1000;
+    this.maxSyncRetries = 3;
+    this.syncRetryCount = 0;
+  }
+
+  get accountId() {
+    return this._accountId;
+  }
+
+  set accountId(value) {
+    this._accountId = value;
   }
 
   async #request(document, variables, requestHeaders) {
     return this.client.request(document, variables, requestHeaders);
   }
 
+  #logError(methodName, error) {
+    console.log(`[ZkoolClient.${methodName}]`, error);
+  }
+
+  #resolveDefault(defaultValue) {
+    return typeof defaultValue === 'function' ? defaultValue() : defaultValue;
+  }
+
+  async #safeCall(methodName, defaultValue, fn) {
+    try {
+      const result = await fn();
+      return result ?? this.#resolveDefault(defaultValue);
+    }
+    catch (error) {
+      this.#logError(methodName, error);
+      return this.#resolveDefault(defaultValue);
+    }
+  }
+
+  #defaultAccount(accountId = this.accountId) {
+    return {
+      aindex: 0,
+      dindex: 0,
+      birth: 0,
+      height: 0,
+      name: '',
+      balance: 0,
+      id: accountId ?? this.accountId
+    };
+  }
+
+  #defaultSeed() {
+    return {
+      seed: '',
+      passphrase: '',
+      birth: 0,
+      aindex: 0
+    };
+  }
+
+  #defaultAddress() {
+    return {
+      ua: '',
+      orchard: '',
+      sapling: '',
+      transparent: ''
+    };
+  }
+
+  #defaultBalance() {
+    return {
+      transparent: 0,
+      sapling: 0,
+      orchard: 0,
+      total: 0
+    };
+  }
+
+  #defaultTransactionInfo(txid = '') {
+    return {
+      height: 0,
+      txid: txid,
+      value: 0,
+      notes: [],
+      outputs: [],
+      spends: []
+    };
+  }
+
   /**
    * Initialize wallet backend; resolves when ready.
+   * @param {boolean} shouldSpawnSyncTask
    * @returns {Promise<any>}
   */
-  async init() {
-    return new Promise(async (resolve, reject) => {
+  async init(shouldSpawnSyncTask = true) {
+    return this.#safeCall('init', false, async () => {
       const rep = await this.#request(
         gql`
           query PingApiVersion {
@@ -26,14 +108,15 @@ class ZkoolClient {
         `
       );
 
-      if(rep.apiVersion) {
-        console.log("Zkool client initialized.");
-        this.syncTask = this.spawnSyncTask();        
-        resolve();
+      if(!rep?.apiVersion) {
+        return false;
       }
-      else {
-        reject();
+
+      console.log('Zkool client initialized.');
+      if(shouldSpawnSyncTask) {
+        this.syncTask = this.spawnSyncTask();
       }
+      return true;
     });
   }
 
@@ -46,26 +129,28 @@ class ZkoolClient {
    * @param {string} passphrase
    * @returns {Promise<any>}
   */
-  async createNewAccount(key, accountIndex, birth = 0, accountName, passphrase = "") {
-    const result = await this.#request(
-      gql`
-        mutation CreateNewAccount($newAccount: NewAccount!) {
-          createAccount(
-            newAccount: $newAccount          
-          )
+  async createNewAccount(key, accountIndex, birth = 0, accountName, passphrase = '') {
+    return this.#safeCall('createNewAccount', { createAccount: null }, async () => {
+      const result = await this.#request(
+        gql`
+          mutation CreateNewAccount($newAccount: NewAccount!) {
+            createAccount(
+              newAccount: $newAccount
+            )
+          }
+        `, {
+          newAccount: {
+            key: key,
+            aindex: accountIndex,
+            birth: birth,
+            name: accountName,
+            passphrase: passphrase,
+            useInternal: false
+          }
         }
-      `, {
-        newAccount: {
-          key: key,
-          aindex: accountIndex,
-          birth: birth,
-          name: accountName,
-          passphrase: passphrase,
-          useInternal: false
-        }
-      }
-    );
-    return result;
+      );
+      return result ?? { createAccount: null };
+    });
   }
 
   /**
@@ -73,21 +158,24 @@ class ZkoolClient {
    * @returns {Promise<any>}
   */
   async getAccounts() {
-    return this.#request(
-      gql`
-        query GetAccounts {
-          accounts {
-            aindex
-            dindex
-            birth
-            height
-            name
-            balance
-            id
+    return this.#safeCall('getAccounts', { accounts: [] }, async () => {
+      const result = await this.#request(
+        gql`
+          query GetAccounts {
+            accounts {
+              aindex
+              dindex
+              birth
+              height
+              name
+              balance
+              id
+            }
           }
-        }
-      `
-    );
+        `
+      );
+      return result ?? { accounts: [] };
+    });
   }
 
   /**
@@ -95,185 +183,227 @@ class ZkoolClient {
    * @param {int} accountId
    * @returns {Promise<any>}
   */
-  async getAccountById(accountId = this.accountId) {
-    const result = await this.#request(
-      gql`
-        query GetAccount($filter: AccountFilter!) {
-          accounts(accountFilter: $filter) {
-            aindex
-            dindex
-            birth
-            height
-            name
-            balance
-            id
+  async getAccountById(accountId) {
+    return this.#safeCall('getAccountById', () => this.#defaultAccount(accountId), async () => {
+      const result = await this.#request(
+        gql`
+          query GetAccount($filter: AccountFilter!) {
+            accounts(accountFilter: $filter) {
+              aindex
+              dindex
+              birth
+              height
+              name
+              balance
+              id
+            }
+          }
+        `, {
+          filter: {
+            id: accountId
           }
         }
-      `, {
-        filter: {
-          id: accountId
-        }
-      }
-    );
-    return result.accounts[0];
+      );
+      return result?.accounts?.[0] ?? this.#defaultAccount(accountId);
+    });
+  }
+
+  /**
+   * Get the current account info.
+   * @returns {Promise<any>}
+  */
+  async getAccountInfo() {
+    return this.#safeCall('getAccountInfo', () => this.#defaultAccount(this.accountId), async () => {
+      return this.getAccountById(this.accountId);
+    });
   }
 
   /**
    * Get account seed or UFVK.
-   * @param {int} accountId
    * @returns {Promise<any>}
   */
-  async getAccountSeed(accountId = this.accountId) {
-    const result = await this.#request(
-      gql`
-        query GetAccount($filter: AccountFilter!) {
-          accounts(accountFilter: $filter) {
-            seed
-            passphrase
-            birth
-            aindex
+  async getAccountSeed() {
+    return this.#safeCall('getAccountSeed', () => this.#defaultSeed(), async () => {
+      const result = await this.#request(
+        gql`
+          query GetAccount($filter: AccountFilter!) {
+            accounts(accountFilter: $filter) {
+              seed
+              passphrase
+              birth
+              aindex
+            }
+          }
+        `, {
+          filter: {
+            id: this.accountId
           }
         }
-      `, {
-        filter: {
-          id: accountId
-        }
-      }
-    );
-    return result.accounts[0];
+      );
+      return result?.accounts?.[0] ?? this.#defaultSeed();
+    });
   }
 
   /**
    * Fetch wallet address.
-   * @param {int} accountId
    * @returns {Promise<any>}
   */
-  async getAddress(accountId = this.accountId) {
-    const result = await this.#request(
-      gql`
-        query GetAddress($id: Int!) {
-          addressByAccount(idAccount: $id) {
-            ua
-            orchard
-            sapling
-            transparent
+  async getAddress() {
+    return this.#safeCall('getAddress', () => this.#defaultAddress(), async () => {
+      const result = await this.#request(
+        gql`
+          query GetAddress($id: Int!) {
+            addressByAccount(idAccount: $id) {
+              ua
+              orchard
+              sapling
+              transparent
+            }
           }
+        `, {
+          id: this.accountId
         }
-      `, {
-        id: accountId
-      }
-    );
-    return result.addressByAccount;
+      );
+      return result?.addressByAccount ?? this.#defaultAddress();
+    });
+  }
+
+  /**
+   * Generate new wallet addresses for current account.
+   * @returns {Promise<any>}
+  */
+  async newAddresses() {
+    return this.#safeCall('newAddresses', () => this.#defaultAddress(), async () => {
+      const result = await this.#request(
+        gql`
+          mutation NewAddresses($id: Int!) {
+            newAddresses(idAccount: $id) {
+              orchard
+              sapling
+              transparent
+              ua
+            }
+          }
+        `, {
+          id: this.accountId
+        }
+      );
+      return result?.newAddresses ?? this.#defaultAddress();
+    });
   }
 
   /**
    * Get total balance for an account.
-   * @param {int} accountId
    * @returns {Promise<any>}
   */
-  async getTotalBalance(accountId = this.accountId) {
-    const result = await this.#request(
-      gql`
-        query GetTotalBalance($id: Int!) {
-          balanceByAccount(idAccount: $id) {
-          transparent
-          sapling  
-          orchard
-          total
+  async getTotalBalance() {
+    return this.#safeCall('getTotalBalance', () => this.#defaultBalance(), async () => {
+      const result = await this.#request(
+        gql`
+          query GetTotalBalance($id: Int!) {
+            balanceByAccount(idAccount: $id) {
+            transparent
+            sapling
+            orchard
+            total
+            }
           }
+        `, {
+          id: this.accountId
         }
-      `, {
-        id: accountId      
-      }
-    );
-    return result.balanceByAccount;
+      );
+      return result?.balanceByAccount ?? this.#defaultBalance();
+    });
   }
 
   /**
    * List transactions for an account.
-   * @param {int} accountId
    * @returns {Promise<any>}
   */
-  async getTransactions(accountId = this.accountId) {
-    const result = await this.#request(
-      gql`
-        query GetTransactions($id: Int!) {
-          transactionsByAccount(idAccount: $id) {
-            txid
-            value
-            fee
-            time
-            height
+  async getTransactions() {
+    return this.#safeCall('getTransactions', [], async () => {
+      const result = await this.#request(
+        gql`
+          query GetTransactions($id: Int!) {
+            transactionsByAccount(idAccount: $id) {
+              txid
+              value
+              fee
+              time
+              height
+            }
           }
+        `, {
+          id: this.accountId
         }
-      `, {
-        id: accountId
-      }
-    );
-    return result.transactionsByAccount
+      );
+      return result?.transactionsByAccount ?? [];
+    });
   }
 
   /**
    * Get transaction info.
-   * @param {int} accountId
    * @param {string} txid
    * @returns {Promise<any>}
   */
-  async getTransactionInfo(accountId = this.accountId, txid) {
-    const result = await this.#request(
-      gql`
-        query GetTransactionInfo($id: Int!, $txid: String!) {
-          transactionById(idAccount: $id, txid: $txid) {
-            height
-            txid
-            value
-            notes {
-              address
-              memo
+  async getTransactionInfo(txid) {
+    return this.#safeCall('getTransactionInfo', () => this.#defaultTransactionInfo(txid), async () => {
+      const result = await this.#request(
+        gql`
+          query GetTransactionInfo($id: Int!, $txid: String!) {
+            transactionById(idAccount: $id, txid: $txid) {
+              height
+              txid
               value
-              pool
-            }
-            outputs {
-              value
-              memo
-              address
-              pool
-            }
-            spends {
-              address
-              diversifier
-              memo
-              pool
-              value
+              notes {
+                address
+                memo
+                value
+                pool
+              }
+              outputs {
+                value
+                memo
+                address
+                pool
+              }
+              spends {
+                address
+                diversifier
+                memo
+                pool
+                value
+              }
             }
           }
+        `, {
+          id: this.accountId,
+          txid: txid
         }
-      `, {
-        id: accountId,
-        txid: txid
-      }
-    );
-    return result.transactionById;
+      );
+      return result?.transactionById ?? this.#defaultTransactionInfo(txid);
+    });
   }
 
   /**
    * Fetch the latest transaction id.
-   * @param {int} accountId
    * @returns {Promise<any>}
   */
-  async getLastTxId(accountId = this.accountId) {
-    const result = await this.#request(
-      gql`
-        query GetLastTxId($id: Int!) {
-          transactionsByAccount(idAccount: $id) {
-            txid
+  async getLastTxId() {
+    return this.#safeCall('getLastTxId', { txid: null }, async () => {
+      const result = await this.#request(
+        gql`
+          query GetLastTxId($id: Int!) {
+            transactionsByAccount(idAccount: $id) {
+              txid
+            }
           }
+        `, {
+          id: this.accountId
         }
-      `, {
-        id: accountId
-      }
-    );
-    return result.transactionsByAccount[0];
+      );
+      return result?.transactionsByAccount?.[0] ?? { txid: null };
+    });
   }
 
   /**
@@ -281,118 +411,161 @@ class ZkoolClient {
    * @returns {Promise<any>}
   */
   async getServerHeight() {
-    const result = await this.#request(
-      gql`
-        query GetServerHeight {
-          currentHeight
-        }
-      `
-    );
-    return result.currentHeight;
+    return this.#safeCall('getServerHeight', 0, async () => {
+      const result = await this.#request(
+        gql`
+          query GetServerHeight {
+            currentHeight
+          }
+        `
+      );
+      return result?.currentHeight ?? 0;
+    });
   }
 
   /**
    * Get account synched height.
-   * @param {int} accountId
    * @returns {Promise<any>}
   */
-  async getWalletHeight(accountId = this.accountId) {
-    let result = await this.#request(
-      gql`
-        query GetWalletHeight($filter: AccountFilter!) {
-          accounts(accountFilter: $filter) {
-            height
+  async getWalletHeight() {
+    return this.#safeCall('getWalletHeight', 0, async () => {
+      const result = await this.#request(
+        gql`
+          query GetWalletHeight($filter: AccountFilter!) {
+            accounts(accountFilter: $filter) {
+              height
+            }
+          }
+        `, {
+          filter: {
+            id: this.accountId
           }
         }
-      `, {
-        filter: {
-          id: accountId
-        }
-      }
-    );
-    return result.accounts[0].height;
+      );
+      return result?.accounts?.[0]?.height ?? 0;
+    });
   }
 
   /**
    * Submit a transaction payload.
-   * @param {int} accountId
    * @param {object} sendJson
    * @returns {Promise<any>}
   */
-  async sendTransaction(accountId = this.accountId, sendJson) {
-    return this.#request(
-      gql`
-        mutation SendTransaction($id: Int!, $sendTos: [Recipient!]!) {
-          pay(idAccount: $id, payment: { recipients: $sendTos })
-        }
-      `,
-      { 
-        id: accountId, 
-        sendTos: sendJson.map((el) => {
+  async sendTransaction(sendJson) {
+    return this.#safeCall('sendTransaction', { pay: null }, async () => {
+      const recipients = (Array.isArray(sendJson) ? sendJson : [sendJson])
+        .filter(Boolean)
+        .map((el) => {
           return {
-            address: el.address,
-            amount: el.amount,
-            memo: el.memo
+            address: el?.address ?? '',
+            amount: el?.amount ?? 0,
+            memo: el?.memo ?? ''
+          };
+        });
+
+      if(recipients.length === 0) {
+        return { pay: null };
+      }
+
+      const result = await this.#request(
+        gql`
+          mutation SendTransaction($id: Int!, $sendTos: [Recipient!]!) {
+            pay(idAccount: $id, payment: { recipients: $sendTos })
           }
-        })
-       }
-    );
+        `,
+        {
+          id: this.accountId,
+          sendTos: recipients
+        }
+      );
+      return result ?? { pay: null };
+    });
   }
 
   /**
    * Synchronize an account with the backend.
-   * @param {int} accountId
    * @returns {Promise<any>}
   */
-  async synchronize(accountId = this.accountId) {
-    return this.#request(
-      gql`
-        mutation SynchronizeAccount($ids: [Int!]!) {
-          synchronize(idAccounts: $ids)
+  async synchronize() {
+    return this.#safeCall('synchronize', { synchronize: false }, async () => {
+      const result = await this.#request(
+        gql`
+          mutation SynchronizeAccount($ids: [Int!]!) {
+            synchronize(idAccounts: $ids)
+          }
+        `, {
+          ids: this.accountId
         }
-      `, {
-        ids: accountId
-      }
-    );    
+      );
+      return result ?? { synchronize: false };
+    });
   }
-
 
   /**
    * Spawn a new sync task.
-   * @param {int} accountId
    * @returns {Promise<any>}
   */
-  spawnSyncTask(accountId = this.accountId) {
+  spawnSyncTask() {
+    if(this.syncTask) {
+      clearInterval(this.syncTask);
+    }
+
     const syncTimer = setInterval(async () => {
       if(this.syncLock) {
-        console.log("Already have a sync task running");
+        console.log('Already have a sync task running');
         return;
       }
 
       this.syncLock = true;
-      
-      const serverHeight = await this.getServerHeight();
-      const accHeight =  await this.getWalletHeight(accountId);
-      console.log(`Chain tip: ${serverHeight} | Wallet height: ${accHeight}`);
-      if(serverHeight > accHeight) {
-        console.log(`${serverHeight - accHeight} new blocks`);
-        this.synchronize(accountId).then(async (res) => {
-          this.syncLock = false;
-          console.log("Wallet is up to date", res);            
-        }).catch((err) => {
-          console.log(err)
-          this.syncLock = false;
-        });        
-      }
-      else {
-        this.syncLock = false;
-        console.log("No new blocks.");
-      }
-    }, 60 * 1000); 
 
-    console.log("Sync task spawned.");
+      try {
+        const serverHeight = await this.getServerHeight();
+        const accHeight = await this.getWalletHeight();
+        console.log(`Chain tip: ${serverHeight} | Wallet height: ${accHeight}`);
+
+        if(serverHeight <= accHeight) {
+          this.syncRetryCount = 0;
+          console.log('No new blocks.');
+          return;
+        }
+
+        if(this.syncRetryCount >= this.maxSyncRetries) {
+          console.log('Sync retry limit reached. Skipping this cycle.');
+          return;
+        }
+
+        console.log(`${serverHeight - accHeight} new blocks`);
+        this.synchronize().then((res) => {
+          this.syncRetryCount = 0;
+          console.log('Wallet sync completed.', res);
+        }).catch((error) => {
+          this.#logError('spawnSyncTask', error);
+          this.syncRetryCount += 1;
+
+          if(this.syncRetryCount >= this.maxSyncRetries) {
+            console.log('Sync retry limit reached after errors.');
+          }
+        });
+        return;
+      }
+      catch (error) {
+        this.#logError('spawnSyncTask', error);
+        this.syncRetryCount += 1;
+
+        if(this.syncRetryCount >= this.maxSyncRetries) {
+          console.log('Sync retry limit reached after errors.');
+        }
+      }
+      finally {
+        this.syncLock = false;
+      }
+    }, this.syncIntervalMs);
+
+    console.log('Sync task spawned.');
     return syncTimer;
   }
+
 }
+
 
 module.exports = { ZkoolClient, gql };

@@ -343,10 +343,23 @@ class ZkoolClient {
 
   /**
    * Get transaction info.
-   * @param {string} txid
+   * @param {int|string} accountIdOrTxid - Account ID (when called with 2 args) or txid (when called with 1 arg)
+   * @param {string} [txidArg] - Transaction ID (when called with 2 args)
    * @returns {Promise<any>}
-  */
-  async getTransactionInfo(txid) {
+   */
+  async getTransactionInfo(accountIdOrTxid, txidArg) {
+    // Support both (txid) and (accountId, txid) call signatures
+    let accountId, txid;
+    if (txidArg !== undefined) {
+      accountId = accountIdOrTxid;
+      txid = txidArg;
+    } else {
+      accountId = this.accountId;
+      txid = accountIdOrTxid;
+    }
+    // Coerce txid to string to prevent GraphQL type errors
+    txid = String(txid);
+
     return this.#safeCall('getTransactionInfo', () => this.#defaultTransactionInfo(txid), async () => {
       const result = await this.#request(
         gql`
@@ -377,7 +390,7 @@ class ZkoolClient {
             }
           }
         `, {
-          id: this.accountId,
+          id: accountId,
           txid: txid
         }
       );
@@ -448,10 +461,21 @@ class ZkoolClient {
 
   /**
    * Submit a transaction payload.
-   * @param {object} sendJson
+   * @param {int|object|Array} accountIdOrSendJson - Account ID (when called with 2 args) or send payload (when called with 1 arg)
+   * @param {object|Array} [sendJsonArg] - Send payload (when called with 2 args)
    * @returns {Promise<any>}
-  */
-  async sendTransaction(sendJson) {
+   */
+  async sendTransaction(accountIdOrSendJson, sendJsonArg) {
+    // Support both (sendJson) and (accountId, sendJson) call signatures
+    let accountId, sendJson;
+    if (sendJsonArg !== undefined) {
+      accountId = accountIdOrSendJson;
+      sendJson = sendJsonArg;
+    } else {
+      accountId = this.accountId;
+      sendJson = accountIdOrSendJson;
+    }
+
     return this.#safeCall('sendTransaction', { pay: null }, async () => {
       const recipients = (Array.isArray(sendJson) ? sendJson : [sendJson])
         .filter(Boolean)
@@ -474,7 +498,7 @@ class ZkoolClient {
           }
         `,
         {
-          id: this.accountId,
+          id: accountId,
           sendTos: recipients
         }
       );
@@ -484,17 +508,24 @@ class ZkoolClient {
 
   /**
    * Synchronize an account with the backend.
+   * @param {boolean} [fast] - Enable fast sync mode (controlled via ZKOOL_FAST_SYNC env var by default)
    * @returns {Promise<any>}
   */
-  async synchronize() {
+  async synchronize(fast) {
+    // Default to env var if not explicitly provided
+    if (fast === undefined) {
+      fast = process.env.ZKOOL_FAST_SYNC === 'true';
+    }
+
     return this.#safeCall('synchronize', { synchronize: false }, async () => {
       const result = await this.#request(
         gql`
-          mutation SynchronizeAccount($ids: [Int!]!) {
-            synchronize(idAccounts: $ids)
+          mutation SynchronizeAccount($ids: [Int!]!, $fast: Boolean!) {
+            synchronize(idAccounts: $ids, fast: $fast)
           }
         `, {
-          ids: this.accountId
+          ids: this.accountId,
+          fast: !!fast
         }
       );
       return result ?? { synchronize: false };

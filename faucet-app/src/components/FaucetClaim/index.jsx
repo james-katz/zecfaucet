@@ -126,8 +126,7 @@ export default function FaucetClaim({ applyVoucher, faucetClosed }) {
         setChallenge({
           id: res.data.message.id,
           msg: res.data.message.message,
-          difficulty: res.data.message.difficulty,
-          vpn: res.data.message.vpn
+          difficulty: res.data.message.difficulty
         });
         setModalVisible(true);
       }

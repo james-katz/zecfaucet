@@ -27,8 +27,7 @@ const network = process.env.NETWORK;
 const zkool = new ZkoolClient(gql_url);
 
 const useHttps = process.env.USE_HTTPS === "true";
-const checkVpn = process.env.CHECK_VPN === "true";
-const blockVpn = process.env.BLOCK_VPN === "true";
+
 
 const faucetClosed = process.env.FAUCET_CLOSED === "true";
 
@@ -192,7 +191,7 @@ zkool.init().then(async () => {
                             const txTimestamp = new Date(tx.time);
 
                             let txMemo = "No memo available";
-                            const txDetails = await zkool.getTransactionInfo(1, tx.txid);
+                            const txDetails = await zkool.getTransactionInfo(zkool.accountId, tx.txid);
                             // console.log(txDetails)
                             if (txDetails.notes &&
                                 txDetails.notes.length > 0 &&
@@ -608,7 +607,6 @@ app.post('/api/challenge', async (req, res) => {
     }
 
     const userIp = getClientIp(req);
-    let isVpn = false;
     let reScore = 1.0;
 
     const validAddr = () => {
@@ -674,30 +672,9 @@ app.post('/api/challenge', async (req, res) => {
                     });
                 }
 
-                if (checkVpn) {
-                    const proxyOrVpn = await axios.get(`http://check.getipintel.net/check.php?ip=${ipAddress}&contact=james.j.katz@protonmail.com`);
-                    if (proxyOrVpn && proxyOrVpn.data > 0.90) {
-                        console.log("VPN/Proxy detected.");
-
-                        // if(blockVpn && voucherIsValid.valid) {
-                        //     return res.send({
-                        //         status: 403,
-                        //         message: `Please disable your VPN in order to use this coupon.`
-                        //     });
-                        // }
-
-                        if (blockVpn) {
-                            return res.send({
-                                status: 403,
-                                message: `Sorry, we couldn't verify you're not a robot.`
-                            });
-                        }
-                        isVpn = true;
-                    }
-                }
             }
             catch (err) {
-                console.log("Couldn't check user reCaptcha score or ip for proxy or vpn.");
+                console.log("Couldn't check user reCaptcha score or geolocation.");
             }
 
             // Then check if faucet has enough balance
@@ -715,33 +692,9 @@ app.post('/api/challenge', async (req, res) => {
             // TODO improve this
             const queueSum = queue.length * u_payout;
 
-            const vouchers = await Voucher.findAll({ raw: true });
+            console.log(`Faucet balance: ${bal.total}, Queue sum: ${queueSum}, trying to add ${pay} to the queue`);
 
-            let reservedBalance = 0;
-
-            for (const voucher of vouchers) {
-                const usedCount = await Claim.count({
-                    where: { voucherId: voucher.id }
-                });
-
-                const remaining = Math.max(0, voucher.max_supply - usedCount);
-                reservedBalance += remaining * voucher.payout;
-            }
-
-
-            console.log(`Faucet balance: ${bal.total}, Reserved balance: ${reservedBalance}, Queue sum: ${queueSum}, trying to add ${pay} to the queue`);
-
-            const safeMargin = 0.0; //0.005;
-
-            if (!voucherIsValid.valid && bal.total - (queueSum + pay) < reservedBalance + safeMargin) {
-                console.log("Balance is reserved for couponns holders.")
-                return res.send({
-                    status: 503,
-                    message: `The faucet balance is reserved for coupon holders.`
-                });
-            }
-
-            if (bal.total - safeMargin < queueSum + pay) {
+            if (bal.total < queueSum + pay) {
                 return res.send({
                     status: 503,
                     message: `It looks like the faucet wallet don't have enough funds 🥹`
@@ -773,7 +726,7 @@ app.post('/api/challenge', async (req, res) => {
                     });
                 }
 
-                // const base = isVpn ? 15 : 8;
+
                 const base = network == 'test' ? 5 : 8;
                 let baseDiff = Math.min(15, base + Math.floor(claimsPerHour / 4));
 
@@ -807,7 +760,7 @@ app.post('/api/challenge', async (req, res) => {
                         id: challenge.id,
                         message: challenge.message,
                         difficulty: challenge.difficulty,
-                        vpn: isVpn
+
                     }
                 });
             }
@@ -1129,6 +1082,17 @@ app.post('/api/vouchers/create_from_api', verifyApiToken, async (req, res) => {
         const apiUser = await User.findOne({ where: { username: 'api' } });
         if (!apiUser) {
             return res.status(404).json({ message: 'API user not found' });
+        }
+
+        // Check if faucet balance can cover the voucher payout
+        const bal = await zkool.getTotalBalance();
+        const pendingQueue = await Claim.findAll({ where: { pending: true } });
+        const queueSum = pendingQueue.length * u_payout;
+
+        if (bal.total < queueSum + payout) {
+            return res.status(400).json({
+                message: `Insufficient faucet balance to create this voucher.`
+            });
         }
 
         await apiUser.createVoucher({

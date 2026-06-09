@@ -6,7 +6,7 @@ export default function ProofOfWorkModal({ visible, onDecline, onSuccess, challe
     const [completed, setCompleted] = useState(false);    
     const [message, setMessage] = useState('');    
     const [difficulty, setDifficulty] = useState(0);    
-    const [isVpn, setIsVpn] = useState(false);
+
     const [invertBtns, setInvertBtns] = useState(false);
     const [nonce, setNonce] = useState(0);
     const [hash, setHash] = useState(0);
@@ -36,7 +36,7 @@ export default function ProofOfWorkModal({ visible, onDecline, onSuccess, challe
         bestEffort.current = { nonce: 0, hash: 'f'.repeat(64) };
         startTime.current = Date.now();
 
-        const timeCap = isVpn ? 2*60*1000 : 60*1000;
+        const timeCap = 60*1000;
         const minTime = 5000 + Math.random() * 2500;
         const maxTime = Math.min(timeCap, Math.floor(minTime * Math.pow(1.44, difficulty - 5)));
 
@@ -120,7 +120,7 @@ export default function ProofOfWorkModal({ visible, onDecline, onSuccess, challe
     useEffect(() => {
         setMessage(challenge.msg);
         setDifficulty(challenge.difficulty);
-        setIsVpn(challenge.vpn);
+
         
         setInvertBtns(Math.random() >= 0.5);
 

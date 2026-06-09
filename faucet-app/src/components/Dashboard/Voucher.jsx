@@ -1,10 +1,12 @@
-import React, { useState, useEffect } from 'react';
-import { useOutletContext } from 'react-router-dom'; // Importar useOutletContext
+import React, { useState, useEffect, useMemo } from 'react';
+import { useOutletContext } from 'react-router-dom';
 import httpCommon from '../../http-common';
 import VoucherItem from './VoucherItem';
 
 import './index.css';
 import { toast } from 'react-hot-toast';
+
+const PAGE_SIZE = 10;
 
 export default function Voucher({ setLogin }) {
   const { coinName } = useOutletContext();
@@ -17,6 +19,12 @@ export default function Voucher({ setLogin }) {
   const [newVoucherAmount, setNewVoucherAmount] = useState(0);
   const [newVoucherMemo, setNewVoucherMemo] = useState('');
   const [newVoucherSupply, setNewVoucherSupply] = useState(0);
+
+  // Search & pagination
+  const [searchQuery, setSearchQuery] = useState('');
+  const [currentPage, setCurrentPage] = useState(1);
+  const [sortField, setSortField] = useState('code');
+  const [sortAsc, setSortAsc] = useState(true);
 
   const handleCodeChange = (e) => {
     setNewVoucherCode(e.target.value);
@@ -123,19 +131,110 @@ export default function Voucher({ setLogin }) {
     fetchVouchers();
   }, []);
 
-  const filteredVoucherList = hideApiVouchers
-    ? voucherList
-    : voucherList.filter((voucher) => voucher.user?.username !== 'api');
+  const handleSort = (field) => {
+    if (sortField === field) {
+      setSortAsc(!sortAsc);
+    } else {
+      setSortField(field);
+      setSortAsc(true);
+    }
+    setCurrentPage(1);
+  };
+
+  // Filtered, sorted, paginated list
+  const processedList = useMemo(() => {
+    let list = hideApiVouchers
+      ? voucherList
+      : voucherList.filter((v) => v.user?.username !== 'api');
+
+    // Search filter
+    if (searchQuery.trim()) {
+      const q = searchQuery.trim().toLowerCase();
+      list = list.filter((v) =>
+        v.code.toLowerCase().includes(q) ||
+        v.memo.toLowerCase().includes(q) ||
+        v.user?.username?.toLowerCase().includes(q)
+      );
+    }
+
+    // Sort
+    list = [...list].sort((a, b) => {
+      let valA, valB;
+      switch (sortField) {
+        case 'code':
+          valA = a.code.toLowerCase();
+          valB = b.code.toLowerCase();
+          break;
+        case 'payout':
+          valA = a.payout;
+          valB = b.payout;
+          break;
+        case 'usage':
+          valA = a.usageCount || 0;
+          valB = b.usageCount || 0;
+          break;
+        case 'supply':
+          valA = a.max_supply;
+          valB = b.max_supply;
+          break;
+        default:
+          valA = a.code;
+          valB = b.code;
+      }
+      if (valA < valB) return sortAsc ? -1 : 1;
+      if (valA > valB) return sortAsc ? 1 : -1;
+      return 0;
+    });
+
+    return list;
+  }, [voucherList, hideApiVouchers, searchQuery, sortField, sortAsc]);
+
+  const totalPages = Math.max(1, Math.ceil(processedList.length / PAGE_SIZE));
+  const paginatedList = processedList.slice(
+    (currentPage - 1) * PAGE_SIZE,
+    currentPage * PAGE_SIZE
+  );
+
+  // Reset to page 1 when filters change
+  useEffect(() => {
+    setCurrentPage(1);
+  }, [searchQuery, hideApiVouchers]);
+
+  // Summary stats
+  const totalVouchers = processedList.length;
+  const totalReserved = processedList.reduce((sum, v) => {
+    const remaining = Math.max(0, v.max_supply - (v.usageCount || 0));
+    return sum + remaining * v.payout;
+  }, 0);
+  const fullyUsed = processedList.filter(v => (v.usageCount || 0) >= v.max_supply).length;
 
   return (
     <section className="dashboard-section">
-      <h2>ZecFaucet coupons</h2>
+      <h2>ZecFaucet Coupons</h2>
+
+      {/* Summary strip */}
+      <div className="voucher-summary-strip">
+        <div className="voucher-summary-item">
+          <span className="voucher-summary-value">{totalVouchers}</span>
+          <span className="voucher-summary-label">Total</span>
+        </div>
+        <div className="voucher-summary-item">
+          <span className="voucher-summary-value">{fullyUsed}</span>
+          <span className="voucher-summary-label">Depleted</span>
+        </div>
+        <div className="voucher-summary-item">
+          <span className="voucher-summary-value">{totalReserved.toFixed(4)}</span>
+          <span className="voucher-summary-label">Reserved ({coinName || 'ZEC'})</span>
+        </div>
+      </div>
+
+      {/* Create button / form */}
       {!newVoucherVisible ? (
         <button
           className='create-btn'
           onClick={()=>{setNewVoucherVisible(true)}}
           >
-            New coupon
+            + New Coupon
         </button>
       ):(
         <div className="new-coupon-widget">
@@ -177,17 +276,57 @@ export default function Voucher({ setLogin }) {
           </div>
         </div>
       )}
-      <label className="voucher-filter">
-        <input
-          type="checkbox"          
-          checked={hideApiVouchers}
-          onChange={(e) => setHideApiVouchers(e.target.checked)}
-        />
-        Show vouchers created from API
-      </label>
 
+      {/* Toolbar: search + filter */}
+      <div className="voucher-toolbar">
+        <div className="voucher-search-box">
+          <span className="voucher-search-icon">🔍</span>
+          <input
+            type="text"
+            placeholder="Search by code, memo, or creator..."
+            value={searchQuery}
+            onChange={(e) => setSearchQuery(e.target.value)}
+            className="voucher-search-input"
+          />
+          {searchQuery && (
+            <button className="voucher-search-clear" onClick={() => setSearchQuery('')}>✕</button>
+          )}
+        </div>
+        <label className="voucher-filter">
+          <input
+            type="checkbox"          
+            checked={hideApiVouchers}
+            onChange={(e) => setHideApiVouchers(e.target.checked)}
+          />
+          Include API vouchers
+        </label>
+      </div>
+
+      {/* Sort buttons */}
+      <div className="voucher-sort-bar">
+        <span className="voucher-sort-label">Sort by:</span>
+        {[
+          { key: 'code', label: 'Code' },
+          { key: 'payout', label: 'Payout' },
+          { key: 'usage', label: 'Usage' },
+          { key: 'supply', label: 'Supply' },
+        ].map(({ key, label }) => (
+          <button
+            key={key}
+            className={`voucher-sort-btn ${sortField === key ? 'active' : ''}`}
+            onClick={() => handleSort(key)}
+          >
+            {label} {sortField === key ? (sortAsc ? '▲' : '▼') : ''}
+          </button>
+        ))}
+      </div>
+
+      {/* Voucher list */}
       <div className='voucher-list'>
-        {filteredVoucherList.map(voucher => (
+        {paginatedList.length === 0 && (
+          <p className="voucher-empty">No coupons found.</p>
+        )}
+        {paginatedList.map(voucher => (
           <VoucherItem
             key={voucher.id}
             id={voucher.id}
@@ -197,11 +336,41 @@ export default function Voucher({ setLogin }) {
             totalSupply={voucher.max_supply}
             usageCount={voucher.usageCount}
             creatorName={voucher.user.username}
+            coinName={coinName}
             onSave={handleUpdateVoucher}
             onDelete={handleDeleteVoucher}
           />
         ))}
       </div>
+
+      {/* Pagination */}
+      {totalPages > 1 && (
+        <div className="voucher-pagination">
+          <button
+            className="voucher-page-btn"
+            disabled={currentPage === 1}
+            onClick={() => setCurrentPage(1)}
+          >«</button>
+          <button
+            className="voucher-page-btn"
+            disabled={currentPage === 1}
+            onClick={() => setCurrentPage((p) => Math.max(1, p - 1))}
+          >‹</button>
+          <span className="voucher-page-info">
+            Page {currentPage} of {totalPages}
+          </span>
+          <button
+            className="voucher-page-btn"
+            disabled={currentPage === totalPages}
+            onClick={() => setCurrentPage((p) => Math.min(totalPages, p + 1))}
+          >›</button>
+          <button
+            className="voucher-page-btn"
+            disabled={currentPage === totalPages}
+            onClick={() => setCurrentPage(totalPages)}
+          >»</button>
+        </div>
+      )}
     </section>
   );
 }

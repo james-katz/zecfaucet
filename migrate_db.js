@@ -35,7 +35,7 @@ async function migrate_db() {
             const txFee = tx.fee;                         
             let txMemo = "No memo available";
             
-            const txDetails = await zkool.getTransactionInfo(1, txTxid);
+            const txDetails = await zkool.getTransactionInfo(zkool.accountId, txTxid);
 
             if(txKind === "received") {                
                 if(txDetails.notes &&

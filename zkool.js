@@ -1,5 +1,42 @@
 const { GraphQLClient, gql } = require('graphql-request');
 
+// Errors worth retrying: the Zkool backend is busy, not broken.
+const TRANSIENT_ERRORS = ['pool timed out', 'database is locked', 'econnreset', 'socket hang up'];
+
+const isTransientError = (error) => {
+  const text = `${error?.message ?? ''} ${JSON.stringify(error?.response?.errors ?? '')}`.toLowerCase();
+  return TRANSIENT_ERRORS.some((needle) => text.includes(needle));
+};
+
+const TX_INFO_QUERY = gql`
+  query GetTransactionInfo($id: Int!, $txid: String!) {
+    transactionById(idAccount: $id, txid: $txid) {
+      height
+      txid
+      value
+      notes {
+        address
+        memo
+        value
+        pool
+      }
+      outputs {
+        value
+        memo
+        address
+        pool
+      }
+      spends {
+        address
+        diversifier
+        memo
+        pool
+        value
+      }
+    }
+  }
+`;
+
 class ZkoolClient {
   constructor(endpoint, options = {}) {
     this.client = new GraphQLClient(endpoint, options);
@@ -21,7 +58,23 @@ class ZkoolClient {
   }
 
   async #request(document, variables, requestHeaders) {
-    return this.client.request(document, variables, requestHeaders);
+    // Only read-only queries are retried; mutations (pay, synchronize) are never
+    // replayed automatically to avoid double side effects.
+    const isMutation = /^\s*mutation\b/.test(String(document));
+    const maxAttempts = isMutation ? 1 : 4;
+
+    for (let attempt = 1; ; attempt++) {
+      try {
+        return await this.client.request(document, variables, requestHeaders);
+      }
+      catch (error) {
+        if (attempt >= maxAttempts || !isTransientError(error)) {
+          throw error;
+        }
+        const delay = 400 * 2 ** (attempt - 1) + Math.floor(Math.random() * 200);
+        await new Promise((resolve) => setTimeout(resolve, delay));
+      }
+    }
   }
 
   #logError(methodName, error) {
@@ -382,41 +435,23 @@ class ZkoolClient {
     txid = String(txid);
 
     return this.#safeCall('getTransactionInfo', () => this.#defaultTransactionInfo(txid), async () => {
-      const result = await this.#request(
-        gql`
-          query GetTransactionInfo($id: Int!, $txid: String!) {
-            transactionById(idAccount: $id, txid: $txid) {
-              height
-              txid
-              value
-              notes {
-                address
-                memo
-                value
-                pool
-              }
-              outputs {
-                value
-                memo
-                address
-                pool
-              }
-              spends {
-                address
-                diversifier
-                memo
-                pool
-                value
-              }
-            }
-          }
-        `, {
-          id: accountId,
-          txid: txid
-        }
-      );
-      return result?.transactionById ?? this.#defaultTransactionInfo(txid);
+      return (await this.fetchTransactionInfo(accountId, txid)) ?? this.#defaultTransactionInfo(txid);
     });
+  }
+
+  /**
+   * Get transaction info, throwing on failure instead of returning a default.
+   * Useful when callers must distinguish "no data" from "request failed".
+   * @param {int} accountId
+   * @param {string} txid
+   * @returns {Promise<any|null>} transaction details, or null if not found
+   */
+  async fetchTransactionInfo(accountId, txid) {
+    const result = await this.#request(TX_INFO_QUERY, {
+      id: accountId ?? this.accountId,
+      txid: String(txid)
+    });
+    return result?.transactionById ?? null;
   }
 
   /**
@@ -569,6 +604,7 @@ class ZkoolClient {
       }
 
       this.syncLock = true;
+      let syncStarted = false;
 
       try {
         const serverHeight = await this.getServerHeight();
@@ -587,6 +623,10 @@ class ZkoolClient {
         }
 
         console.log(`${serverHeight - accHeight} new blocks`);
+        // Keep the lock until the sync actually finishes; otherwise a long sync
+        // gets a second one started on top of it every interval, exhausting
+        // the Zkool connection pool ("pool timed out while waiting...").
+        syncStarted = true;
         this.synchronize().then((res) => {
           this.syncRetryCount = 0;
           console.log('Wallet sync completed.', res);
@@ -597,6 +637,8 @@ class ZkoolClient {
           if(this.syncRetryCount >= this.maxSyncRetries) {
             console.log('Sync retry limit reached after errors.');
           }
+        }).finally(() => {
+          this.syncLock = false;
         });
         return;
       }
@@ -609,7 +651,9 @@ class ZkoolClient {
         }
       }
       finally {
-        this.syncLock = false;
+        if (!syncStarted) {
+          this.syncLock = false;
+        }
       }
     }, this.syncIntervalMs);
 

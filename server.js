@@ -10,6 +10,7 @@ const crypto = require('crypto');
 const createPuzzle = require('node-puzzle');
 
 const { verifySlider } = require('./verify_captcha');
+const { getZecPrice } = require('./price');
 
 const jwt = require('jsonwebtoken');
 
@@ -61,6 +62,10 @@ let cooldown = false;
 
 let latestHeight = 0;
 
+// Zkool backend availability (exposed to the frontend through /api/network)
+let zkoolOnline = false;
+const healthCheckInterval = 30; // Time in seconds between Zkool health checks
+
 // In-memory store for challenge puzzles
 const store = new Map(); // id -> { x, expiresAt, width, height }
 
@@ -82,14 +87,37 @@ const fakeSendTransaction = (foo) => {
 }
 
 // Initialize Zkool Client
-zkool.init().then(async () => {
+zkool.init().then(async (ready) => {
+    zkoolOnline = ready === true;
+    if (!zkoolOnline) {
+        console.log("Zkool backend is offline. Serving public stats only until it comes back.");
+    }
+
     //initialize the database
     await initializeDatabase();
 
     latestHeight = await zkool.getWalletHeight();
 
+    // Watch Zkool availability
+    setInterval(async () => {
+        const alive = await zkool.ping();
+        if (alive && !zkoolOnline) {
+            console.log("Zkool backend is back online.");
+            if (!zkool.syncTask) {
+                await zkool.init();
+            }
+            latestHeight = await zkool.getWalletHeight();
+        }
+        else if (!alive && zkoolOnline) {
+            console.log("Zkool backend went offline.");
+        }
+        zkoolOnline = alive;
+    }, healthCheckInterval * 1000);
+
     // Send payments every `payInterval` minutes
     const timerID = setInterval(async () => {
+        if (!zkoolOnline) return;
+
         const currentHeight = await zkool.getWalletHeight();
         const elapsedBlocks = currentHeight - latestHeight;
 
@@ -163,6 +191,8 @@ zkool.init().then(async () => {
 
     // Check new donations
     const donationsTimerId = setInterval(async () => {
+        if (!zkoolOnline) return;
+
         const lastDbTxid = await Transaction.findAll({
             where: { kind: 'received' },
             order: [['createdAt', 'DESC']],
@@ -234,8 +264,167 @@ function getClientIp(req) {
 app.get('/api/network', (req, res) => {
     res.json({
         net: network,
-        closed: faucetClosed
+        closed: faucetClosed,
+        online: zkoolOnline
     });
+});
+
+// ---------------------------------------------------------------------------
+// Public, database-only endpoints (work even when Zkool is offline)
+// ---------------------------------------------------------------------------
+
+const NO_MEMO = 'No memo available';
+
+app.get('/api/public/overview', async (req, res) => {
+    try {
+        const [
+            totalReceived,
+            totalSent,
+            totalFees,
+            donationsCount,
+            payoutTxCount,
+            totalClaims,
+            uniqueRecipients,
+            largestDonation,
+            firstActivity,
+            lastPayout,
+            lastDonation
+        ] = await Promise.all([
+            Transaction.sum('value', { where: { kind: 'received' } }),
+            Transaction.sum('value', { where: { kind: 'sent' } }),
+            Transaction.sum('fee', { where: { kind: 'sent' } }),
+            Transaction.count({ where: { kind: 'received' } }),
+            Transaction.count({ where: { kind: 'sent' } }),
+            Claim.count({ where: { pending: false } }),
+            Claim.count({ where: { pending: false }, distinct: true, col: 'address' }),
+            Transaction.max('value', { where: { kind: 'received' } }),
+            Transaction.min('createdAt'),
+            Transaction.max('createdAt', { where: { kind: 'sent' } }),
+            Transaction.max('createdAt', { where: { kind: 'received' } })
+        ]);
+
+        const price = await getZecPrice();
+
+        res.json({
+            network: network,
+            coin: network === 'test' ? 'TAZ' : 'ZEC',
+            online: zkoolOnline,
+            totals: {
+                received: Number(totalReceived) || 0,
+                sent: Number(totalSent) || 0,
+                fees: Number(totalFees) || 0,
+                donations: donationsCount,
+                payoutTransactions: payoutTxCount,
+                claims: totalClaims,
+                uniqueRecipients: uniqueRecipients,
+                largestDonation: Number(largestDonation) || 0
+            },
+            dates: {
+                firstActivity: firstActivity,
+                lastPayout: lastPayout,
+                lastDonation: lastDonation
+            },
+            price: price
+        });
+    }
+    catch (err) {
+        console.log(err);
+        res.status(500).json({ message: 'Internal server error.' });
+    }
+});
+
+app.get('/api/public/activity', async (req, res) => {
+    try {
+        const day = fn('DATE', col('createdAt'));
+
+        const [sentRows, receivedRows, claimRows] = await Promise.all([
+            Transaction.findAll({
+                attributes: [[day, 'date'], [fn('SUM', col('value')), 'amount'], [fn('COUNT', '*'), 'txs']],
+                where: { kind: 'sent' },
+                group: [day],
+                raw: true
+            }),
+            Transaction.findAll({
+                attributes: [[day, 'date'], [fn('SUM', col('value')), 'amount']],
+                where: { kind: 'received' },
+                group: [day],
+                raw: true
+            }),
+            Claim.findAll({
+                attributes: [[day, 'date'], [fn('COUNT', '*'), 'claims']],
+                where: { pending: false },
+                group: [day],
+                raw: true
+            })
+        ]);
+
+        const byDate = new Map();
+        const entry = (date) => {
+            if (!byDate.has(date)) {
+                byDate.set(date, { date, sent: 0, received: 0, claims: 0, txs: 0 });
+            }
+            return byDate.get(date);
+        };
+
+        sentRows.forEach((r) => {
+            if (!r.date) return;
+            const e = entry(r.date);
+            e.sent = Number(r.amount) || 0;
+            e.txs = Number(r.txs) || 0;
+        });
+        receivedRows.forEach((r) => {
+            if (!r.date) return;
+            entry(r.date).received = Number(r.amount) || 0;
+        });
+        claimRows.forEach((r) => {
+            if (!r.date) return;
+            entry(r.date).claims = Number(r.claims) || 0;
+        });
+
+        const series = [...byDate.values()].sort((a, b) => a.date.localeCompare(b.date));
+        res.json(series);
+    }
+    catch (err) {
+        console.log(err);
+        res.status(500).json({ message: 'Internal server error.' });
+    }
+});
+
+app.get('/api/public/donations', async (req, res) => {
+    try {
+        const limit = Math.min(50, Math.max(1, parseInt(req.query.limit, 10) || 10));
+        const page = Math.max(1, parseInt(req.query.page, 10) || 1);
+        const sort = req.query.sort === 'top' ? 'top' : 'recent';
+
+        const order = sort === 'top'
+            ? [['value', 'DESC'], ['createdAt', 'DESC']]
+            : [['createdAt', 'DESC']];
+
+        const { count, rows } = await Transaction.findAndCountAll({
+            where: { kind: 'received' },
+            order: order,
+            limit: limit,
+            offset: (page - 1) * limit
+        });
+
+        res.json({
+            page: page,
+            limit: limit,
+            total: count,
+            pages: Math.max(1, Math.ceil(count / limit)),
+            sort: sort,
+            items: rows.map((tx) => ({
+                txid: tx.txid,
+                value: Number(tx.value) || 0,
+                memo: tx.memo && tx.memo !== NO_MEMO ? tx.memo : null,
+                time: tx.createdAt
+            }))
+        });
+    }
+    catch (err) {
+        console.log(err);
+        res.status(500).json({ message: 'Internal server error.' });
+    }
 });
 
 app.get('/api/payout', async (req, res) => {

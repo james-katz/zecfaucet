@@ -121,6 +121,27 @@ class ZkoolClient {
   }
 
   /**
+   * Lightweight health check against the Zkool backend.
+   * Does not log errors, so it can be polled periodically.
+   * @returns {Promise<boolean>} true if the backend answered
+  */
+  async ping() {
+    try {
+      const rep = await this.#request(
+        gql`
+          query PingApiVersion {
+            apiVersion
+          }
+        `
+      );
+      return Boolean(rep?.apiVersion);
+    }
+    catch (error) {
+      return false;
+    }
+  }
+
+  /**
    * Create new account.
    * @param {string} key
    * @param {int} accountIndex

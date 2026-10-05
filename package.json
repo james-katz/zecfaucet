@@ -16,6 +16,12 @@
     "sqlite3": "^5.1.7"
   },
   "scripts": {
-    "start": "node server.js"
+    "start": "node server.js",
+    "dev": "concurrently -k -n api,web -c yellow,cyan \"npm:dev:api\" \"npm:dev:web\"",
+    "dev:api": "node server.js",
+    "dev:web": "VITE_API_URL=/api npm --prefix faucet-app run dev"
+  },
+  "devDependencies": {
+    "concurrently": "^10.0.5"
   }
 }

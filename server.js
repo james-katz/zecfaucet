@@ -66,6 +66,11 @@ let latestHeight = 0;
 let zkoolOnline = false;
 const healthCheckInterval = 30; // Time in seconds between Zkool health checks
 
+// Only payouts that actually got a txid from the wallet count as sent.
+// (Older versions recorded failed sends with txid = NULL.)
+const SENT_CONFIRMED = { kind: 'sent', txid: { [Op.ne]: null } };
+const CLAIM_PAID = { pending: false, transactionTxid: { [Op.ne]: null } };
+
 // In-memory store for challenge puzzles
 const store = new Map(); // id -> { x, expiresAt, width, height }
 
@@ -159,6 +164,13 @@ zkool.init().then(async (ready) => {
             zkool.sendTransaction(zkool.accountId, sendJson).then(async (tx) => {
                 // fakeSendTransaction(sendJson).then(async (txid)=>{                               
                 console.log(tx);
+
+                // sendTransaction swallows errors and returns { pay: null } on failure:
+                // don't record a payout or mark claims as paid in that case.
+                if (!tx || !tx.pay) {
+                    console.log(`Payment failed (no txid returned). ${queue.length} claim(s) stay in the queue for the next cycle.`);
+                    return;
+                }
 
                 const totalValue = sendJson.map((el) => el.amount).reduce((acc, curr) => acc + curr, 0);
                 // console.log(totalValue)
@@ -291,15 +303,15 @@ app.get('/api/public/overview', async (req, res) => {
             lastDonation
         ] = await Promise.all([
             Transaction.sum('value', { where: { kind: 'received' } }),
-            Transaction.sum('value', { where: { kind: 'sent' } }),
-            Transaction.sum('fee', { where: { kind: 'sent' } }),
+            Transaction.sum('value', { where: SENT_CONFIRMED }),
+            Transaction.sum('fee', { where: SENT_CONFIRMED }),
             Transaction.count({ where: { kind: 'received' } }),
-            Transaction.count({ where: { kind: 'sent' } }),
-            Claim.count({ where: { pending: false } }),
-            Claim.count({ where: { pending: false }, distinct: true, col: 'address' }),
+            Transaction.count({ where: SENT_CONFIRMED }),
+            Claim.count({ where: CLAIM_PAID }),
+            Claim.count({ where: CLAIM_PAID, distinct: true, col: 'address' }),
             Transaction.max('value', { where: { kind: 'received' } }),
             Transaction.min('createdAt'),
-            Transaction.max('createdAt', { where: { kind: 'sent' } }),
+            Transaction.max('createdAt', { where: SENT_CONFIRMED }),
             Transaction.max('createdAt', { where: { kind: 'received' } })
         ]);
 
@@ -340,7 +352,7 @@ app.get('/api/public/activity', async (req, res) => {
         const [sentRows, receivedRows, claimRows] = await Promise.all([
             Transaction.findAll({
                 attributes: [[day, 'date'], [fn('SUM', col('value')), 'amount'], [fn('COUNT', '*'), 'txs']],
-                where: { kind: 'sent' },
+                where: SENT_CONFIRMED,
                 group: [day],
                 raw: true
             }),
@@ -352,7 +364,7 @@ app.get('/api/public/activity', async (req, res) => {
             }),
             Claim.findAll({
                 attributes: [[day, 'date'], [fn('COUNT', '*'), 'claims']],
-                where: { pending: false },
+                where: CLAIM_PAID,
                 group: [day],
                 raw: true
             })
@@ -461,7 +473,7 @@ app.get('/api/dashboard-stats', async (req, res) => {
     });
 
     const totalSent = await Transaction.sum('value', {
-        where: { kind: 'sent' }
+        where: SENT_CONFIRMED
     });
 
     const totalClaims = await Claim.count();
@@ -479,7 +491,7 @@ app.get('/api/dashboard-stats', async (req, res) => {
             [fn('COUNT', '*'), 'total']
         ],
         where: {
-            kind: 'sent',
+            ...SENT_CONFIRMED,
             createdAt: {
                 [Op.gte]: sevenDaysAgo
             }
@@ -553,7 +565,7 @@ app.get('/api/txns', async (req, res) => {
 
 app.get('/api/stats', async (req, res) => {
     const totalSent = await Transaction.sum('value', {
-        where: { kind: 'sent' }
+        where: SENT_CONFIRMED
     });
 
     const totalClaims = await Claim.count();

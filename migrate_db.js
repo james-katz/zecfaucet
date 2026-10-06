@@ -270,7 +270,9 @@ async function migrate_db() {
         CONCURRENCY,
         async (tx) => {
             try {
-                return await withRetry(() => zkool.fetchTransactionInfo(zkool.accountId, tx.txid), tx.txid);
+                // Received txs need `notes` (donation memo); sent txs only need `outputs`.
+                const opts = { notes: (Number(tx.value) || 0) > 0 };
+                return await withRetry(() => zkool.fetchTransactionParts(zkool.accountId, tx.txid, opts), tx.txid);
             }
             catch (err) {
                 failed.push(tx.txid);

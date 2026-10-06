@@ -8,7 +8,7 @@ import {
   CartesianGrid,
   Tooltip,
 } from 'recharts';
-import { formatZec, formatUsd, formatNumber, formatCompact } from './format';
+import { formatZec, formatUsd, formatCompact } from './format';
 
 const DAY = 24 * 60 * 60 * 1000;
 
@@ -98,11 +98,6 @@ function ChartTooltip({ active, payload, bucket, coin, price }) {
       </div>
       {price ? <div className="ol-tooltip-sub">≈ {formatUsd(p.sent * price)}</div> : null}
       <div className="ol-tooltip-row">
-        <span className="ol-dot ol-dot-light" />
-        <span>Claims</span>
-        <strong>{formatNumber(p.claims)}</strong>
-      </div>
-      <div className="ol-tooltip-row">
         <span className="ol-dot ol-dot-green" />
         <span>Donations</span>
         <strong>{formatZec(p.received)} {coin}</strong>
@@ -112,16 +107,15 @@ function ChartTooltip({ active, payload, bucket, coin, price }) {
 }
 
 export default function ActivityChart({ activity, coin, price }) {
-  const [periodKey, setPeriodKey] = useState('90d');
+  const [periodKey, setPeriodKey] = useState('all');
   const [metric, setMetric] = useState('sent');
 
   const metrics = [
     { key: 'sent', label: `${coin} sent` },
-    { key: 'claims', label: 'Claims' },
     { key: 'received', label: 'Donations' },
   ];
 
-  const period = PERIODS.find((p) => p.key === periodKey) || PERIODS[1];
+  const period = PERIODS.find((p) => p.key === periodKey) || PERIODS[PERIODS.length - 1];
   const { bucket, points } = useMemo(() => buildSeries(activity || [], period), [activity, period]);
 
   const totals = useMemo(() => points.reduce((acc, p) => ({
@@ -132,7 +126,7 @@ export default function ActivityChart({ activity, coin, price }) {
   }), { sent: 0, claims: 0, received: 0, txs: 0 }), [points]);
 
   const isEmpty = totals[metric] === 0;
-  const barColor = metric === 'received' ? 'url(#olBarGreen)' : metric === 'claims' ? 'url(#olBarLight)' : 'url(#olBarGold)';
+  const barColor = metric === 'received' ? 'url(#olBarGreen)' : 'url(#olBarGold)';
   const bucketLabel = bucket === 'day' ? 'daily' : bucket === 'week' ? 'weekly' : 'monthly';
 
   return (
@@ -181,11 +175,6 @@ export default function ActivityChart({ activity, coin, price }) {
           {price ? <span className="ol-summary-usd">≈ {formatUsd(totals.sent * price)}</span> : null}
         </div>
         <div>
-          <span className="ol-summary-label">Claims served</span>
-          <span className="ol-summary-value">{formatNumber(totals.claims)}</span>
-          <span className="ol-summary-usd">{formatNumber(totals.txs)} payout txs</span>
-        </div>
-        <div>
           <span className="ol-summary-label">Donations received</span>
           <span className="ol-summary-value">{formatZec(totals.received)} <small>{coin}</small></span>
           {price ? <span className="ol-summary-usd">≈ {formatUsd(totals.received * price)}</span> : null}
@@ -226,7 +215,7 @@ export default function ActivityChart({ activity, coin, price }) {
               tickLine={false}
               axisLine={false}
               width={56}
-              allowDecimals={metric !== 'claims'}
+              allowDecimals
               tickFormatter={(v) => formatCompact(v)}
             />
             <Tooltip

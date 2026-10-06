@@ -37,6 +37,25 @@ const TX_INFO_QUERY = gql`
   }
 `;
 
+// Lean variants: Zkool's `notes` and `spends` resolvers each scan their whole
+// table (no index on `tx`), so only ask for them when really needed.
+const TX_OUTPUTS_QUERY = gql`
+  query GetTransactionOutputs($id: Int!, $txid: String!) {
+    transactionById(idAccount: $id, txid: $txid) {
+      outputs { value memo address pool }
+    }
+  }
+`;
+
+const TX_NOTES_OUTPUTS_QUERY = gql`
+  query GetTransactionNotesOutputs($id: Int!, $txid: String!) {
+    transactionById(idAccount: $id, txid: $txid) {
+      notes { address memo value pool }
+      outputs { value memo address pool }
+    }
+  }
+`;
+
 class ZkoolClient {
   constructor(endpoint, options = {}) {
     this.client = new GraphQLClient(endpoint, options);
@@ -448,6 +467,22 @@ class ZkoolClient {
    */
   async fetchTransactionInfo(accountId, txid) {
     const result = await this.#request(TX_INFO_QUERY, {
+      id: accountId ?? this.accountId,
+      txid: String(txid)
+    });
+    return result?.transactionById ?? null;
+  }
+
+  /**
+   * Like fetchTransactionInfo, but only fetches `outputs` (and `notes` if
+   * requested). Much faster: skips Zkool's slow `spends`/`notes` resolvers.
+   * @param {int} accountId
+   * @param {string} txid
+   * @param {{ notes?: boolean }} [opts]
+   * @returns {Promise<any|null>}
+   */
+  async fetchTransactionParts(accountId, txid, { notes = false } = {}) {
+    const result = await this.#request(notes ? TX_NOTES_OUTPUTS_QUERY : TX_OUTPUTS_QUERY, {
       id: accountId ?? this.accountId,
       txid: String(txid)
     });

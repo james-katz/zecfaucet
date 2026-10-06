@@ -24,7 +24,7 @@ const medal = (rank) => (rank === 1 ? '🥇' : rank === 2 ? '🥈' : rank === 3 
 
 export default function DonationsList({ coin, network, price, totalCount }) {
   const [page, setPage] = useState(1);
-  const [sort, setSort] = useState('recent');
+  const [sort, setSort] = useState('top');
   const [data, setData] = useState(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(false);
@@ -70,15 +70,6 @@ export default function DonationsList({ coin, network, price, totalCount }) {
         </div>
         <div className="ol-segment" role="tablist" aria-label="Sort donations">
           <button
-            id="donations-sort-recent"
-            role="tab"
-            aria-selected={sort === 'recent'}
-            className={`ol-segment-btn ${sort === 'recent' ? 'is-active' : ''}`}
-            onClick={() => changeSort('recent')}
-          >
-            Most recent
-          </button>
-          <button
             id="donations-sort-top"
             role="tab"
             aria-selected={sort === 'top'}
@@ -86,6 +77,15 @@ export default function DonationsList({ coin, network, price, totalCount }) {
             onClick={() => changeSort('top')}
           >
             Largest
+          </button>
+          <button
+            id="donations-sort-recent"
+            role="tab"
+            aria-selected={sort === 'recent'}
+            className={`ol-segment-btn ${sort === 'recent' ? 'is-active' : ''}`}
+            onClick={() => changeSort('recent')}
+          >
+            Most recent
           </button>
         </div>
       </div>

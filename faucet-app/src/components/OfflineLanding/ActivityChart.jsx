@@ -8,7 +8,7 @@ import {
   CartesianGrid,
   Tooltip,
 } from 'recharts';
-import { formatZec, formatUsd, formatCompact } from './format';
+import { formatZec, formatUsd, formatNumber, formatCompact } from './format';
 
 const DAY = 24 * 60 * 60 * 1000;
 
@@ -97,6 +97,11 @@ function ChartTooltip({ active, payload, bucket, coin, price }) {
         <strong>{formatZec(p.sent)} {coin}</strong>
       </div>
       {price ? <div className="ol-tooltip-sub">≈ {formatUsd(p.sent * price)}</div> : null}
+      <div className="ol-tooltip-row">
+        <span className="ol-dot ol-dot-light" />
+        <span>Claims</span>
+        <strong>{formatNumber(p.claims)}</strong>
+      </div>
       <div className="ol-tooltip-row">
         <span className="ol-dot ol-dot-green" />
         <span>Donations</span>

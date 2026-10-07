@@ -435,6 +435,25 @@
   to { background-position: 200% 0; }
 }
 
+.ol-progress-stacked {
+  display: flex;
+}
+
+.ol-progress-stacked .ol-progress-bar {
+  flex-shrink: 0;
+  border-radius: 0;
+}
+
+.ol-progress-stacked .ol-progress-bar:first-child {
+  border-radius: 999px 0 0 999px;
+}
+
+.ol-progress-bar-fees {
+  background: linear-gradient(90deg, #E8833A, #F2A65A);
+  box-shadow: 0 0 14px rgba(232, 131, 58, 0.45);
+  animation: ol-grow 1.4s cubic-bezier(0.22, 1, 0.36, 1) 0.3s both;
+}
+
 .ol-progress-legend {
   display: flex;
   justify-content: space-between;
@@ -463,6 +482,7 @@
 .ol-dot-light { background: #FFF1C9; }
 .ol-dot-green { background: var(--green); }
 .ol-dot-dim { background: rgba(255, 255, 255, 0.25); }
+.ol-dot-fees { background: #E8833A; }
 
 .ol-mini-grid {
   margin-top: 24px;

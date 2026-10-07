@@ -7,7 +7,7 @@ import useCountUp from './useCountUp';
 import { formatZec, formatUsd, formatNumber, formatDate } from './format';
 import {
   HeartIcon, SendIcon, DropletIcon, UsersIcon, TrendUpIcon, TrendDownIcon,
-  RefreshIcon, AwardIcon, CalendarIcon, RepeatIcon, ZapIcon,
+  RefreshIcon, AwardIcon, CalendarIcon, RepeatIcon,
 } from './icons';
 import './index.css';
 
@@ -102,7 +102,12 @@ export default function OfflineLanding() {
   const network = overview?.network || 'main';
   const usd = overview?.price?.usd || null;
   const t = overview?.totals || {};
-  const distributedPct = t.received > 0 ? Math.min(100, (t.sent / t.received) * 100) : 0;
+  const pctOf = (v) => (t.received > 0 ? Math.min(100, Math.max(0, ((v || 0) / t.received) * 100)) : 0);
+  const sentPct = pctOf(t.sent);
+  const feesPct = Math.min(100 - sentPct, pctOf(t.fees));
+  const balance = t.balance ?? Math.max(0, (t.received || 0) - (t.sent || 0) - (t.fees || 0));
+  // Share of donations that already left the wallet (payouts + network fees).
+  const distributedPct = sentPct + feesPct;
   const toUsd = (zec) => (usd ? formatUsd(zec * usd) : null);
 
   return (
@@ -206,16 +211,19 @@ export default function OfflineLanding() {
                 <div className="ol-flow-head">
                   <div>
                     <h3 className="ol-card-title">Where the donations went</h3>
-                    <p className="ol-card-sub">Share of all donated {coin} already dripped back to the community</p>
+                    <p className="ol-card-sub">Every donated {coin}: dripped to the community, paid as network fees, or still in the faucet</p>
                   </div>
                   <span className="ol-flow-pct">{distributedPct.toFixed(1)}%</span>
                 </div>
-                <div className="ol-progress" role="progressbar" aria-valuenow={Math.round(distributedPct)} aria-valuemin={0} aria-valuemax={100}>
-                  <div className="ol-progress-bar" style={{ width: `${distributedPct}%` }} />
+                <div className="ol-progress ol-progress-stacked" role="progressbar" aria-valuenow={Math.round(distributedPct)} aria-valuemin={0} aria-valuemax={100}>
+                  <div className="ol-progress-bar" style={{ width: `${sentPct}%` }} title={`Distributed ${formatZec(t.sent)} ${coin}`} />
+                  <div className="ol-progress-bar ol-progress-bar-fees" style={{ width: `${feesPct}%` }} title={`Network fees ${formatZec(t.fees)} ${coin}`} />
                 </div>
                 <div className="ol-progress-legend">
                   <span><span className="ol-dot ol-dot-gold" /> Distributed {formatZec(t.sent)} {coin}</span>
-                  <span><span className="ol-dot ol-dot-dim" /> Donated {formatZec(t.received)} {coin}</span>
+                  <span><span className="ol-dot ol-dot-fees" /> Network fees {formatZec(t.fees)} {coin}</span>
+                  <span><span className="ol-dot ol-dot-dim" /> Remaining {formatZec(balance)} {coin}</span>
+                  <span>of {formatZec(t.received)} {coin} donated</span>
                 </div>
 
                 <div className="ol-mini-grid">
@@ -226,15 +234,7 @@ export default function OfflineLanding() {
                     value={<>{formatZec(t.largestDonation)} {coin}{usd ? <small> · {formatUsd(t.largestDonation * usd)}</small> : null}</>}
                   />
                   <MiniStat icon={<RepeatIcon size={16} />} label="Last payout" value={formatDate(overview?.dates?.lastPayout)} />
-                  {t.fees > 0 ? (
-                    <MiniStat
-                      icon={<ZapIcon size={16} />}
-                      label="Network fees paid"
-                      value={<>{formatZec(t.fees)} {coin}</>}
-                    />
-                  ) : (
-                    <MiniStat icon={<CalendarIcon size={16} />} label="Last donation" value={formatDate(overview?.dates?.lastDonation)} />
-                  )}
+                  <MiniStat icon={<CalendarIcon size={16} />} label="Last donation" value={formatDate(overview?.dates?.lastDonation)} />
                 </div>
               </div>
             </section>

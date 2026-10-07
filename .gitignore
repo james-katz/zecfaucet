@@ -26,3 +26,4 @@ pnpm-debug.log*
 db/zecfaucet.sqlite
 
 test.js
+audit.py

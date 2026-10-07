@@ -300,7 +300,8 @@ app.get('/api/public/overview', async (req, res) => {
             largestDonation,
             firstActivity,
             lastPayout,
-            lastDonation
+            lastDonation,
+            internalFees
         ] = await Promise.all([
             Transaction.sum('value', { where: { kind: 'received' } }),
             Transaction.sum('value', { where: SENT_CONFIRMED }),
@@ -312,19 +313,28 @@ app.get('/api/public/overview', async (req, res) => {
             Transaction.max('value', { where: { kind: 'received' } }),
             Transaction.min('createdAt'),
             Transaction.max('createdAt', { where: SENT_CONFIRMED }),
-            Transaction.max('createdAt', { where: { kind: 'received' } })
+            Transaction.max('createdAt', { where: { kind: 'received' } }),
+            Transaction.sum('fee', { where: { kind: 'internal' } })
         ]);
 
         const price = await getZecPrice();
+
+        // Everything that left the wallet: payouts + fees of payouts + fees of
+        // shielding / self-transfers. What's left of the donations is the balance.
+        const round8 = (v) => Math.round((Number(v) || 0) * 1e8) / 1e8;
+        const received = round8(totalReceived);
+        const sent = round8(totalSent);
+        const fees = round8((Number(totalFees) || 0) + (Number(internalFees) || 0));
 
         res.json({
             network: network,
             coin: network === 'test' ? 'TAZ' : 'ZEC',
             online: zkoolOnline,
             totals: {
-                received: Number(totalReceived) || 0,
-                sent: Number(totalSent) || 0,
-                fees: Number(totalFees) || 0,
+                received: received,
+                sent: sent,
+                fees: fees,
+                balance: Math.max(0, round8(received - sent - fees)),
                 donations: donationsCount,
                 payoutTransactions: payoutTxCount,
                 claims: totalClaims,
